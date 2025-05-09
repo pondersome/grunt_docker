@@ -1,0 +1,14 @@
+repositories:
+
+  # Base chassis repo
+  p2os2:
+    type: git
+    url: https://github.com/pondersome/p2os2.git
+    version: main
+
+  # grunt repositories
+  grunt:
+    type: git
+    url: https://github.com/pondersome/grunt.git
+    version: main
+  
