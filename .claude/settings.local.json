@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/karim/grunt_docker/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

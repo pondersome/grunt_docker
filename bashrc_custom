@@ -11,8 +11,3 @@ source ~/grunt_ws/install/setup.bash
 #export FASTRTPS_DEFAULT_PROFILES_FILE=$config_path
 
 export FASTRTPS_DEFAULT_PROFILES_FILE=$(python3 -c "import os; from ament_index_python.packages import get_package_share_directory; print(os.path.join(get_package_share_directory('grunt_bringup'), 'config', 'fastrtps_profiles.xml'))")
-
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
