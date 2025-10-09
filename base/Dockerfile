@@ -19,7 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  iputils-ping net-tools iproute2 nano vim gedit
 
 # Install additional Python modules
-RUN pip3 install --break-system-packages matplotlib transforms3d
+#RUN pip3 install --break-system-packages matplotlib transforms3d
+RUN pip3 install $([ "${ROS_DISTRO}" = "jazzy" ] && echo "--break-system-packages" || echo "") matplotlib transforms3d
 
 # Include Cyclone DDS as alternate middleware
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -60,7 +61,8 @@ RUN apt install -y libgflags-dev \
     ros-${ROS_DISTRO}-actuator-msgs \
     ros-${ROS_DISTRO}-vision-msgs \
     python3-pip
-RUN pip install --break-system-packages setuptools==58.2.0
+#RUN pip install --break-system-packages setuptools==58.2.0
+RUN pip3 install $([ "${ROS_DISTRO}" = "jazzy" ] && echo "--break-system-packages" || echo "") setuptools==58.2.0
 
 # Clean up apt package list
 RUN rm -rf /var/lib/apt/lists/*
@@ -77,6 +79,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install tools in the virtual environment
 RUN pip install vcstool rosdep colcon-common-extensions
 RUN pip install numpy lark
+# Fix empy version for Humble (requires empy<4.0)
+RUN if [ "${ROS_DISTRO}" = "humble" ]; then pip install 'empy<4.0'; fi
 
 # Initialize rosdep
 RUN rosdep init || echo "rosdep already initialized"

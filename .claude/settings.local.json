@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/karim/grunt_docker/**)"
+      "Read(//home/karim/grunt_docker/**)",
+      "WebFetch(domain:docs.google.com)",
+      "Bash(docker buildx:*)",
+      "Bash(docker run:*)"
     ],
     "deny": [],
     "ask": []

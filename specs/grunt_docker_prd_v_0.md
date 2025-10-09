@@ -1,30 +1,64 @@
 # grunt_docker • Product Requirements Doc (PRD) v0.1
 
 **Purpose**
-Unify all ROS 2 + Docker configurations for the *Grunt* sentry platform into one repo (this repo), while documenting non‑containerized setups that participate in the same robot graph. Optimize for clarity for new contributors and repeatable, cross‑arch builds.
+Unify all ROS 2 + Docker configurations for the *Grunt* sentry platform into one repo (this repo), while documenting non‑containerized setups that participate in the same robot graph. Optimize for clarity for new contributors and repeatable, cross‑arch builds.
 
 ---
 ## 1) Executive summary
-- **Single ROS graph** initially (Barney + Betty + laptops/desktops). BamBam can be segmented later via domain/namespace if needed.
-- **Transport**: Fast DDS today; evaluate **zenoh** for Jazzy migrations.
-- **Priorities**
-  1. Desktop/laptop **visualization stacks** (RViz2, RQT, PlotJuggler, Foxglove/Vizanti) on Windows 11 + WSL2.
-  2. **Betty (Jetson Orin Nano, Ubuntu 22.04, JetPack 6.2)** running Humble (host or containers) and OAK‑D‑Lite camera.
-  3. Shared **networking patterns** over ZeroTier (same domain id, namespacing, TF frames).
-- **Barney (x86_64, 22.04+Humble)** remains host‑native for now; repo documents but does not containerize core robot nodes yet.
+
+### The System Architecture
+The Grunt sentry platform consists of **autonomous mobile robots** operating in field environments and **remote operator workstations** providing visualization, teleoperation, and computational offload. These systems form a **unified ROS 2 graph** communicating over a private VPN (ZeroTier), enabling:
+
+- **Robots in the field** running core autonomy, navigation, and sensor fusion
+- **Windows/WSL2 workstations** running visualization (RViz2, Foxglove) and development tools
+- **Cloud/edge compute** (future) for ML inference and heavy processing
+
+### The Docker Challenge
+While robots traditionally run ROS 2 **natively on Ubuntu** for direct hardware access and real-time performance, operator workstations face different constraints:
+
+- **Windows 11 primary environment** for most developers/operators
+- **Frequent dependency changes** as packages are added/removed during development
+- **Multiple ROS distro versions** (Humble stable, Jazzy migration testing)
+- **Cross-architecture development** (x86_64 workstations, ARM64 Jetson/RPi robots)
+
+Docker provides **dependency isolation and reproducibility** for operator workstations while keeping robots on **native installs for performance**. This repo documents **both approaches** and the patterns to make them interoperate.
+
+### Deployment Model
+
+**Robots (autonomous, field-deployed):**
+- **Barney** (x86_64 NUC, Ubuntu 22.04 + Humble): Primary development platform, all nodes native
+- **Betty** (Jetson Orin Nano, Ubuntu 22.04 + Humble): GPU-accelerated perception, hybrid native+container
+- **BamBam** (RPi 5, Ubuntu 24.04 + Jazzy): Migration testbed for Jazzy distro
+
+**Operator Workstations (Windows 11 + WSL2):**
+- **Visualization containers**: RViz2, RQT, PlotJuggler via WSLg (Wayland)
+- **Web-based tools**: Foxglove Bridge, Vizanti (headless containers)
+- **Development environments**: VSCode devcontainers with full ROS 2 toolchain
+
+### Network Topology
+- **Single ROS_DOMAIN_ID** shared across all participants (robots + workstations)
+- **ZeroTier VPN** provides L2 connectivity across physical networks
+- **Fast DDS** middleware (default); exploring **Zenoh** for Jazzy migrations
+- **Namespace convention**: `/<robot>/<subsystem>` (e.g., `/barney/nav`, `/betty/camera`)
+
+### Priorities (v0.1)
+1. **WSL2 visualization stacks** - containerized RViz2/RQT with WSLg/Wayland support
+2. **Betty bring-up** - Jetson containers with NVIDIA runtime, OAK-D-Lite camera
+3. **Shared networking docs** - ZeroTier setup, DDS tuning, domain/namespace conventions
+4. **Barney documentation** - native install patterns (no containerization yet)
 
 ---
 ## 2) Platforms & roles
 | Host | CPU/GPU | OS | ROS | Role | Container stance |
 |---|---|---|---|---|---|
-| **Barney** | x86_64 iGPU | Ubuntu 22.04 | Humble | Primary dev robot | Native (host) for core nodes; optional per‑subsystem containers later |
-| **Betty** | ARM64 + Jetson GPU | Ubuntu 22.04 (JetPack 6.2) | Humble initially | GPU accel; OAK‑D‑Lite | Mix of host + containers. Use NVIDIA Container Toolkit. |
-| **BamBam** | RPi 5 (ARM64) | Ubuntu 24.04 | Jazzy | Migration testbed | Documented; optional isolated ROS graph if needed |
-| **Windows 11 workstations (WSL2)** | x86_64 + some GPU | WSL2 Ubuntu 24.04 | Humble/Jazzy client tools | Visualization, dev tools, occasional compute | Prefer containers for GUI stacks; WSLg Wayland.
+| **Barney** | x86_64 iGPU | Ubuntu 22.04 | Humble | Primary dev robot | Native (host) for core nodes; optional per‑subsystem containers later |
+| **Betty** | ARM64 + Jetson GPU | Ubuntu 22.04 (JetPack 6.2) | Humble initially | GPU accel; OAK‑D‑Lite | Mix of host + containers. Use NVIDIA Container Toolkit. |
+| **BamBam** | RPi 5 (ARM64) | Ubuntu 24.04 | Jazzy | Migration testbed | Documented; optional isolated ROS graph if needed |
+| **Windows 11 workstations (WSL2)** | x86_64 + some GPU | WSL2 Ubuntu 24.04 | Humble/Jazzy client tools | Visualization, dev tools, occasional compute | Prefer containers for GUI stacks; WSLg Wayland.
 
 ---
 ## 3) Packages likely in play (per Barney today)
-**audio_common, by_your_command, grunt, realsense-ros, RTK_GPS_NTRIP, whisper_ros, bno055, p2os2, roarm_ws_em0, vizanti**  
+**audio_common, by_your_command, grunt, realsense-ros, RTK_GPS_NTRIP, whisper_ros, bno055, p2os2, roarm_ws_em0, vizanti**
 Note: Devices may be swapped per robot (e.g., OAK‑D‑Lite vs RealSense). Repo will provide container stubs or host notes for each.
 
 ---
@@ -73,8 +107,9 @@ Note: Devices may be swapped per robot (e.g., OAK‑D‑Lite vs RealSense). Repo
 │     └─ gazebo-garden.yaml   # host or containerized bridge + sim
 ├─ images/                    # Dockerfiles (multi-arch where useful)
 │  ├─ base/                   # minimal ROS bases (humble, jazzy)
-│  │  ├─ Dockerfile.humble    # x86_64 + arm64
-│  │  └─ Dockerfile.jazzy
+│  │  ├─ Dockerfile              # Multi-stage: base → overlay → dev (ARG ROS_DISTRO)
+│  │  ├─ entrypoint.sh           # Workspace sourcing script
+│  │  └─ dependencies.repos      # External ROS packages to build
 │  ├─ viz/
 │  │  ├─ Dockerfile.rviz
 │  │  ├─ Dockerfile.rqt
@@ -113,14 +148,96 @@ Note: Devices may be swapped per robot (e.g., OAK‑D‑Lite vs RealSense). Repo
 - **Runtime**: `--gpus all` for NVIDIA; `--device` mounts for cameras; grant `/dev/bus/usb` when needed.
 
 ---
+## 6.5) Workspace Layering Convention
+
+Images use a **three-tier workspace strategy**:
+
+1. **`/ros2_ws`** (base image, immutable)
+   - External dependencies from `dependencies.repos`
+   - Built once, cached in image layers
+   - Example: p2os2, grunt core packages
+
+2. **`/overlay_ws` or `/sim_ws`** (overlay image, semi-stable)
+   - Robot-specific packages (navigation, perception)
+   - Rebuilt when robot code changes
+   - Example: grunt_bringup, simulation worlds
+
+3. **`~/dev_ws`** (bind-mounted, ephemeral)
+   - Active development code
+   - Mounted from host via `-v ./grunt_ws:/home/dev/dev_ws`
+   - Built inside container with `colcon build`
+
+**Sourcing order** (in entrypoint.sh):
+```bash
+source /opt/ros/${ROS_DISTRO}/setup.bash
+source /ros2_ws/install/setup.bash
+source /overlay_ws/install/setup.bash  # if exists
+# Dev workspace sourced manually by developer
+```
+
+---
+## 6.6) User Account Strategy
+
+**Build-time (all stages):**
+- Default user: `root` (required for apt, system modifications)
+
+**Runtime users by deployment:**
+
+| Image Stage | User | UID | Purpose |
+|-------------|------|-----|---------|
+| `base` | `root` | 0 | System services, not for interactive use |
+| `dev` | `dev` | 1000 | Interactive development, matches host UID |
+| `robot` (future) | `robot` | 1001 | Production robot nodes, limited privileges |
+
+**Dev image specifics:**
+- Remove default `ubuntu` user (UID 1000 conflict)
+- Create `dev` user with `sudo` access
+- Match host UID/GID for bind-mount permissions
+- Add to `fuse` group for AppImage support
+
+---
+## 6.7) Python Dependency Isolation
+
+To avoid `--break-system-packages` polluting system Python:
+
+**System Python** (`/usr/bin/python3`):
+- ROS 2 runtime packages only
+- No pip installs after base image creation
+
+**Build tools venv** (`/opt/venv`):
+- vcstool, rosdep, colcon-common-extensions
+- Activated in Dockerfile: `ENV PATH="/opt/venv/bin:$PATH"`
+- Used for workspace builds
+
+**Workspace-specific venvs** (future):
+- Per-workspace Python dependencies (ML/vision)
+- Example: `/ros2_ws/venv` for TensorFlow/PyTorch
+
+---
 ## 7) Compose stacks (first wave)
-### 7.1 Visualization on Windows 11 + WSL2 (Wayland/WSLg)
-- Goal: one‑liner `docker compose -f compose/viz/rviz.yaml up` runs RViz on WSL2 with Wayland output.
-- Mounts:
-  - Wayland socket: ensure `/run/user/UID/wayland-0` exists; fallback symlink from `/mnt/wslg/runtime-dir/wayland-0` if needed.
-  - PulseAudio/ALSA (optional) for audio.
-- Env: `WAYLAND_DISPLAY=wayland-0`, `XDG_RUNTIME_DIR=/run/user/UID`.
-- Network: default bridge; ROS graph connectivity via ZeroTier from host or container (document both patterns).
+### 7.1 Visualization on Windows 11 + WSL2 (WSLg/Wayland Primary)
+
+**Goal:** One-liner `docker compose -f compose/viz/rviz.yaml up` runs RViz2 with Wayland.
+
+**Mounts (WSLg/Wayland):**
+```yaml
+volumes:
+  - /mnt/wslg:/mnt/wslg
+environment:
+  - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+  - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+  - PULSE_SERVER=${PULSE_SERVER}
+```
+
+**Optional X11 fallback** (for apps without Wayland support):
+```yaml
+volumes:
+  - /tmp/.X11-unix:/tmp/.X11-unix:ro
+environment:
+  - DISPLAY=${DISPLAY}
+```
+
+**Network:** Use `network_mode: host` for DDS discovery (requires Docker-in-WSL, not Docker Desktop).
 
 ### 7.2 Foxglove Bridge & Vizanti
 - Headless containers exposing web ports (e.g., 8765 for foxglove‑bridge; 8080 for Vizanti proxy).
@@ -154,7 +271,7 @@ Note: Devices may be swapped per robot (e.g., OAK‑D‑Lite vs RealSense). Repo
 
 ---
 ## 10) Registry & build infra (scaffolding)
-- **Registry (TBD)**: start with Docker Hub under `pondersome/*`; later: GHCR or self‑hosted.
+- **Registry**: GHCR (`ghcr.io/pondersome/*`) for all multi-arch images. See `docs/ghcr-setup.md` for authentication setup.
 - **Build**: scripts for local `buildx bake`; future:
   - GH Actions matrix (x86_64) + on‑device Jetson builds; caching via `actions/cache` or registry cache.
 
@@ -223,14 +340,17 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
-      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/1000}
+      # WSLg/Wayland (primary)
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+      - PULSE_SERVER=${PULSE_SERVER}
     volumes:
-      - ${XDG_RUNTIME_DIR:-/run/user/1000}/${WAYLAND_DISPLAY:-wayland-0}:${XDG_RUNTIME_DIR:-/run/user/1000}/${WAYLAND_DISPLAY:-wayland-0}
-      - /tmp/.X11-unix:/tmp/.X11-unix:ro   # fallback for X11 apps
-      - ../..:/work:ro
-    network_mode: host   # simplest for ROS graph on a dev box
-    command: ["bash","-lc","source /opt/ros/humble/setup.bash && rviz2"]
+      # WSLg Wayland socket
+      - /mnt/wslg:/mnt/wslg
+      # Optional: X11 fallback
+      # - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    network_mode: host
+    command: ["rviz2"]  # entrypoint.sh handles sourcing
 ```
 
 ### B) Foxglove Bridge (headless)
@@ -265,7 +385,7 @@ services:
 ---
 ## 19) External links to include in READMEs (curated)
 *(Add these into the relevant docs pages with short explanations for newcomers.)*
-- ROS 2 Humble/Jazzy docs; QoS primer; rosbag2 QoS overrides.
+- ROS 2 Humble/Jazzy docs; QoS primer; rosbag2 QoS overrides.
 - Docker Compose v2 reference.
 - WSLg GUI apps guide & troubleshooting notes for Wayland sockets.
 - NVIDIA Container Toolkit + L4T images for Jetson; JetPack 6.2 docs.
@@ -275,4 +395,3 @@ services:
 
 ---
 *End of PRD v0.1*
-
