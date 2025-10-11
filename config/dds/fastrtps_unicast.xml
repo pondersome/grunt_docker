@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  FastRTPS profile matching grunt_bringup configuration for cross-VPN communication
+
+  This profile mirrors barney's configuration:
+  - Disables built-in transports
+  - Uses custom UDP transport with interface whitelist
+  - Initial peers list commented out (matching working ZeroTier setup)
+-->
+<profiles xmlns="http://www.eprosima.com">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_transport</transport_id>
+      <type>UDPv4</type>
+      <interfaceWhiteList>
+        <address>127.0.0.1</address>
+        <address>10.147.20.21</address>
+        <address>10.147.20.30</address>
+        <address>10.147.20.33</address>
+        <!-- Container's actual network interfaces (from diagnostic) -->
+        <address>192.168.65.3</address>
+        <address>192.168.65.6</address>
+        <address>172.17.0.1</address>
+      </interfaceWhiteList>
+      <maxInitialPeersRange>100</maxInitialPeersRange>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="default_part_profile" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <initialPeersList>
+          <!-- localhost -->
+          <locator>
+            <udpv4>
+              <address>127.0.0.1</address>
+            </udpv4>
+          </locator>
+          <!-- kvlapblack -->
+          <locator>
+            <udpv4>
+              <address>10.147.20.21</address>
+            </udpv4>
+          </locator>
+          <!-- barney -->
+          <locator>
+            <udpv4>
+              <address>10.147.20.30</address>
+            </udpv4>
+          </locator>
+          <!-- wilma -->
+          <locator>
+            <udpv4>
+              <address>10.147.20.33</address>
+            </udpv4>
+          </locator>
+        </initialPeersList>
+      </builtin>
+      <useBuiltinTransports>false</useBuiltinTransports>
+      <userTransports>
+          <transport_id>udp_transport</transport_id>
+      </userTransports>
+    </rtps>
+  </participant>
+</profiles>

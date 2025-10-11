@@ -1,0 +1,57 @@
+# Interactive Bash Shell for WSL2 debugging
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/viz/bash.yaml run --rm bash
+#
+# Use this to debug ROS 2 topic discovery and GUI issues interactively.
+# All ROS 2 commands are available, and you can test:
+#   - ros2 topic list
+#   - ros2 node list
+#   - rviz2
+#   - rqt
+#
+# Requirements:
+#   - Windows 11 with WSLg enabled (default on recent builds)
+#   - WSL2 Ubuntu distribution
+#   - /mnt/wslg socket available
+
+services:
+  bash:
+    image: ghcr.io/pondersome/grunt_base:humble
+    container_name: grunt_bash
+    stdin_open: true
+    tty: true
+
+    environment:
+      # ROS 2 configuration
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
+      # FastRTPS profile for DDS communication (required for topic discovery)
+      # Using unicast profile with explicit peers for cross-VPN discovery
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml
+
+      # WSLg display (works with both X11 and Wayland)
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+
+      # PulseAudio for audio feedback
+      - PULSE_SERVER=${PULSE_SERVER:-/mnt/wslg/PulseServer}
+
+    volumes:
+      # WSLg sockets
+      - /mnt/wslg:/mnt/wslg:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+
+      # DDS configuration for cross-VPN discovery
+      - ../../config/dds:/dds_config:ro
+
+      # Optional: Mount custom RViz config
+      - ../../config/rviz/default.rviz:/root/.rviz2/default.rviz:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Interactive bash shell
+    command: ["/bin/bash"]

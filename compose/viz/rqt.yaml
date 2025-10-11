@@ -1,0 +1,55 @@
+# RQT (ROS Qt GUI) for WSL2 with WSLg/Wayland
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/viz/rqt.yaml up
+#
+# Requirements:
+#   - Windows 11 with WSLg enabled (default on recent builds)
+#   - WSL2 Ubuntu distribution
+#   - /mnt/wslg socket available
+#
+# Troubleshooting:
+#   - See docs/wsl2-visualization.md
+#   - Check WAYLAND_DISPLAY: echo $WAYLAND_DISPLAY
+#   - Check XDG_RUNTIME_DIR: echo $XDG_RUNTIME_DIR
+#   - Verify socket: ls -la /mnt/wslg/
+
+services:
+  rqt:
+    image: ghcr.io/pondersome/grunt_base:humble
+    container_name: grunt_rqt
+
+    environment:
+      # ROS 2 configuration
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
+      # FastRTPS profile for DDS communication (required for topic discovery)
+      # TEMPORARY: Commented out - restrictive whitelist blocks container networks
+      # TODO: Update grunt_bringup profile to include container/WSL2 network ranges
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/ros2_ws/install/grunt_bringup/share/grunt_bringup/config/fastrtps_profiles.xml
+
+      # WSLg display (works with both X11 and Wayland)
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+
+      # PulseAudio for audio feedback
+      - PULSE_SERVER=${PULSE_SERVER:-/mnt/wslg/PulseServer}
+
+    volumes:
+      # WSLg sockets
+      - /mnt/wslg:/mnt/wslg:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+
+      # Optional: Mount custom RQT perspective
+      # - ./config/rqt/default.perspective:/root/.config/ros.org/rqt_gui.ini:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Launch RQT (entrypoint.sh handles ROS 2 sourcing)
+    command: ["rqt"]
+
+    # No auto-restart - let container stop when RQT closes
+    # restart: unless-stopped

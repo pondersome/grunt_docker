@@ -4,7 +4,8 @@
       "Read(//home/karim/grunt_docker/**)",
       "WebFetch(domain:docs.google.com)",
       "Bash(docker buildx:*)",
-      "Bash(docker run:*)"
+      "Bash(docker run:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
