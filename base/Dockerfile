@@ -113,6 +113,14 @@ RUN curl -o Groot2.AppImage https://s3.us-west-1.amazonaws.com/download.behavior
 # RUN chmod -R 0700 /tmp/runtime-root
 # ENV NO_AT_BRIDGE 1
 
+# Source ROS environment in /etc/bash.bashrc for docker exec sessions
+# This ensures ROS is available when using `docker exec -it <container> bash`
+RUN echo "# Auto-source ROS 2 environment" >> /etc/bash.bashrc && \
+    echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc && \
+    echo "source /ros2_ws/install/setup.bash" >> /etc/bash.bashrc && \
+    echo "# Suppress daemon timeout warnings (known issue in Docker)" >> /etc/bash.bashrc && \
+    echo "export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET" >> /etc/bash.bashrc
+
 # Add entrypoint
 WORKDIR /ros2_ws
 COPY ./base/entrypoint.sh /
