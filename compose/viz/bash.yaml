@@ -1,19 +1,27 @@
-# Interactive Bash Shell for WSL2 debugging
+# Interactive Bash Shell for Development & Debugging
+#
+# PURPOSE: Development and debugging tool for ROS 2 DDS discovery and GUI testing.
+#          This is NOT a production service - use specific compose files
+#          (rviz.yaml, rqt.yaml) for production workloads.
 #
 # Quick Start (from repo root):
 #   docker compose -f compose/viz/bash.yaml run --rm bash
 #
-# Use this to debug ROS 2 topic discovery and GUI issues interactively.
-# All ROS 2 commands are available, and you can test:
-#   - ros2 topic list
-#   - ros2 node list
-#   - rviz2
-#   - rqt
+# Once inside, you must start the ROS 2 daemon manually:
+#   ros2 daemon start
+#
+# Then you can:
+#   - Test DDS discovery: ros2 topic list, ros2 node list
+#   - Launch GUI tools: rviz2, rqt
+#   - Debug network issues: ss -ulpn | grep 74, tcpdump
+#   - Check DDS config: bash /dds_config/diagnose_dds.sh
 #
 # Requirements:
-#   - Windows 11 with WSLg enabled (default on recent builds)
-#   - WSL2 Ubuntu distribution
-#   - /mnt/wslg socket available
+#   - Native Docker in WSL2 (NOT Docker Desktop)
+#   - WSL2 mirrored networking enabled (.wslconfig)
+#   - ZeroTier VPN connected on Windows
+#   - Windows Firewall rule for UDP ports 7400-7500
+#   - See: docs/native-docker-wsl2-setup.md
 
 services:
   bash:

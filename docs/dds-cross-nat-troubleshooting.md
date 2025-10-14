@@ -1,36 +1,225 @@
-# DDS Cross-NAT Discovery Troubleshooting
+# DDS Cross-NAT Discovery - RESOLVED
 
 ## Problem Statement
-Attempting to enable ROS 2 DDS topic discovery between:
+Successfully enabled ROS 2 DDS topic discovery between:
 - **Barney** (robot at 10.147.20.30 on ZeroTier VPN)
-- **Container** (Docker on Windows 11 WSL2, NAT'd through kvlapblack at 10.147.20.21)
+- **Container** (Native Docker on Windows 11 WSL2 with mirrored networking)
 
-## Network Topology
+## Solution Summary
+
+The issue required **three components** to work together:
+
+1. ✅ **WSL2 Mirrored Networking** - Allows WSL2 to see ZeroTier network directly
+2. ✅ **Native Docker in WSL2** - Provides true `network_mode: host` (Docker Desktop's host mode is limited)
+3. ✅ **Windows Firewall Rule** - Allows inbound UDP on DDS discovery ports (7400-7500)
+
+## Network Topology (Final Working Configuration)
+
 ```
 Barney (10.147.20.30 - ZeroTier VPN)
-  ↕ VPN
+  ↕ VPN (UDP discovery packets on ports 7400/7410/7412)
 Windows Host "kvlapblack" (10.147.20.21 - ZeroTier VPN interface)
-  ↕ Hyper-V NAT
-WSL2 VM (172.24.26.173)
-  ↕ Docker NAT
-Container (192.168.65.3, 192.168.65.6, 172.17.0.1)
+  ↕ Mirrored Networking (WSL2 shares Windows network stack)
+WSL2 VM (sees 10.147.20.21 directly via eth0)
+  ↕ Native Docker with network_mode: host
+Container (shares WSL2's network stack, sees 10.147.20.21)
 ```
 
-**Key issue**: Container has NO 10.147.20.x interface - all VPN traffic is NAT'd through multiple layers.
+**Key difference from before**: With mirrored networking + native Docker, there is NO NAT between container and ZeroTier network.
 
-## Current Status
+## Step-by-Step Solution
 
-### ✅ Working
-1. **IP Connectivity**: Container can ping barney (10.147.20.30) - routing works
-2. **Barney local discovery**: Works after reducing peer list (see below)
-3. **Container DDS ports**: Listening on 7400, 7410, 7412 across all interfaces
-4. **GUI display**: RViz/RQT windows render correctly via WSLg
+### 1. Enable WSL2 Mirrored Networking
 
-### ❌ Not Working
-1. **Cross-network discovery**: Container cannot see barney's `/chatter` topic
-2. **Verbose logging**: `FASTDDS_VERBOSITY=info` produces no output (unclear why)
+Create/edit `C:\Users\<username>\.wslconfig`:
 
-### ⚠️ Performance Issue Identified
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+Restart WSL2:
+```powershell
+# From Windows PowerShell
+wsl --shutdown
+# Then restart WSL2 terminal
+```
+
+Verify ZeroTier network is visible in WSL2:
+```bash
+# In WSL2
+ip addr show
+# Should show eth0 with 10.147.20.21
+```
+
+### 2. Switch from Docker Desktop to Native Docker
+
+**Uninstall Docker Desktop** (or shut it down):
+```powershell
+# From Windows
+taskkill /IM "Docker Desktop.exe" /F
+```
+
+**Install native Docker in WSL2**:
+```bash
+# In WSL2
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Start Docker service
+sudo service docker start
+
+# Verify
+docker ps
+```
+
+**Note**: Docker Desktop's `network_mode: host` only refers to its internal VM, not the actual Windows/WSL2 network. Native Docker provides true host networking.
+
+### 3. Update FastRTPS Configuration
+
+Edit `config/dds/fastrtps_unicast.xml` to match actual container interfaces:
+
+```xml
+<interfaceWhiteList>
+  <!-- Only include interfaces that actually exist with native Docker + mirrored networking -->
+  <address>127.0.0.1</address>
+  <address>10.147.20.21</address>     <!-- ZeroTier VPN (kvlapblack) -->
+  <address>192.168.43.91</address>    <!-- Mobile hotspot or your network -->
+  <address>172.17.0.1</address>       <!-- docker0 bridge -->
+</interfaceWhiteList>
+
+<initialPeersList>
+  <locator>
+    <udpv4>
+      <address>127.0.0.1</address>
+    </udpv4>
+  </locator>
+  <locator>
+    <udpv4>
+      <address>10.147.20.21</address>  <!-- kvlapblack -->
+    </udpv4>
+  </locator>
+  <locator>
+    <udpv4>
+      <address>10.147.20.30</address>  <!-- barney -->
+    </udpv4>
+  </locator>
+  <!-- Remove unreachable peers to avoid timeout lag -->
+</initialPeersList>
+```
+
+**Key changes**:
+- `interfaceWhiteList` now includes `10.147.20.21` (ZeroTier IP visible in container)
+- Removed Docker Desktop IPs (`192.168.65.x`) that no longer exist
+- Commented out unreachable peers (wilma) to avoid 3-5 second lag
+
+### 4. Configure Windows Firewall
+
+**The critical step**: Windows Firewall was blocking inbound UDP packets from barney.
+
+**Create firewall rule** (from PowerShell as Administrator):
+
+```powershell
+# Allow inbound UDP for ROS 2 DDS discovery ports
+New-NetFirewallRule -DisplayName "ROS 2 DDS Discovery" -Direction Inbound -Protocol UDP -LocalPort 7400-7500 -Action Allow -Profile Any
+```
+
+**Alternative - Allow all traffic to WSL2** (less secure but simpler):
+```powershell
+# Allow all inbound traffic through wsl.exe
+New-NetFirewallRule -DisplayName "WSL2 Full Access" -Direction Inbound -Action Allow -Program "C:\Windows\System32\wsl.exe" -Profile Any
+```
+
+**Verify firewall rule**:
+```powershell
+Get-NetFirewallRule -DisplayName "ROS 2 DDS Discovery"
+```
+
+### 5. Test Discovery
+
+```bash
+# Start container with native Docker
+docker-compose -f compose/viz/bash.yaml run --rm bash
+
+# In container, verify ZeroTier network is visible
+ip addr show | grep 10.147.20.21
+
+# Start ROS 2 daemon (important!)
+ros2 daemon start
+
+# Test discovery
+ros2 topic list
+
+# Should see barney's topics, e.g., /chatter
+ros2 topic echo /chatter
+```
+
+## Debugging Process Summary
+
+### Issue 1: Docker Desktop's Limited Host Networking
+**Symptom**: Container with `network_mode: host` showed `192.168.65.x` IPs instead of `10.147.20.21`
+
+**Root cause**: Docker Desktop uses its own VM, and "host" mode refers to that VM's network, not WSL2's.
+
+**Solution**: Switch to native Docker in WSL2 for true host networking.
+
+### Issue 2: WSL2 Couldn't See ZeroTier Network
+**Symptom**: `ip addr show` in WSL2 showed `172.24.26.173` but not `10.147.20.21`
+
+**Root cause**: WSL2 default NAT mode creates isolated network namespace.
+
+**Solution**: Enable `networkingMode=mirrored` in `.wslconfig`.
+
+### Issue 3: Invalid Interface IPs in FastRTPS Config
+**Symptom**: `ss -ulpn | grep 74` showed no listening ports
+
+**Root cause**: `interfaceWhiteList` contained non-existent Docker Desktop IPs (`192.168.65.x`), causing transport initialization to fail.
+
+**Solution**: Update whitelist with actual container interfaces from `ip addr show`.
+
+### Issue 4: Windows Firewall Blocking Return Path
+**Symptom**:
+- ✅ Container sending discovery packets to barney (confirmed with tcpdump)
+- ✅ Barney receiving packets (confirmed with tcpdump on barney)
+- ✅ Barney sending replies (confirmed with tcpdump on barney)
+- ❌ Container not receiving replies
+
+**Root cause**: Windows Firewall was blocking inbound UDP on ports 7400-7500.
+
+**Solution**: Create firewall rule to allow inbound UDP on DDS ports.
+
+**Debugging commands used**:
+```bash
+# On container - verify outbound packets
+tcpdump -i any 'udp and dst host 10.147.20.30 and (port 7400 or port 7410 or port 7412)' -n -c 10
+
+# On barney - verify packets arriving
+sudo tcpdump -i any 'udp and src host 10.147.20.21 and (port 7400 or port 7410 or port 7412)' -n -c 10
+
+# On barney - verify replies being sent
+sudo tcpdump -i any 'udp and dst host 10.147.20.21 and (port 7400 or port 7410 or port 7412)' -n -c 10
+
+# On container - verify replies NOT arriving (before firewall fix)
+tcpdump -i any 'udp and src host 10.147.20.30' -n -c 10
+
+# On WSL2 - verify replies not even reaching WSL2 (before firewall fix)
+sudo tcpdump -i any 'udp and src host 10.147.20.30' -n -c 10
+```
+
+This methodical packet tracing isolated the firewall as the blocker.
+
+### Issue 5: ROS 2 Daemon Connection Timeout
+**Symptom**: `ros2 topic list` hung with `TimeoutError: [Errno 110] Connection timed out`
+
+**Root cause**: ROS 2 daemon socket wasn't created (`/tmp/ros2_daemon_*` missing).
+
+**Solution**: Run `ros2 daemon start` explicitly. With daemon running, all `ros2` CLI commands work normally.
+
+## Performance Issue: Unreachable Peers
+
 **Problem**: Including unreachable peers in `initialPeersList` causes severe lag:
 - 3-5 second delays between messages
 - 5+ minute delay to handle Ctrl+C signals
@@ -38,331 +227,197 @@ Container (192.168.65.3, 192.168.65.6, 172.17.0.1)
 
 **Root cause**: FastDDS waits for timeouts on unreachable peers in the discovery list.
 
-**Solution**: Only include active/reachable peers in `initialPeersList`.
+**Solution**: Only include active/reachable peers. Comment out offline robots:
+
+```xml
+<!-- wilma - commented out to avoid timeout lag from unreachable peer
+<locator>
+  <udpv4>
+    <address>10.147.20.33</address>
+  </udpv4>
+</locator>
+-->
+```
+
+**Long-term implications**: Current FastDDS unicast discovery is fragile for dynamic networks. Consider:
+- FastDDS Discovery Server (centralized discovery)
+- CycloneDDS (better NAT handling)
+- Timeout configuration tuning
+
+## Verification
+
+### Both Directions Working
+- ✅ Container can see barney's `/chatter` topic
+- ✅ Barney can see container's `/chatter` topic
+- ✅ `ros2 topic echo /chatter` shows interleaved messages from both sources
+
+### Commands to Verify
+```bash
+# In container
+ros2 topic list
+# Should show /chatter, /parameter_events, /rosout
+
+ros2 topic echo /chatter
+# Should show messages from barney's talker
+
+ros2 run demo_nodes_cpp talker
+# Barney should now see two streams of messages
+```
 
 ## Configuration Files
 
-### Barney's Config
-**Location**: `/ros2_ws/src/grunt/grunt_bringup/config/fastrtps_profiles.xml`
-
-**Current working config** (after pruning peer list):
-```xml
-<transport_descriptors>
-  <transport_descriptor>
-    <transport_id>udp_transport</transport_id>
-    <type>UDPv4</type>
-    <interfaceWhiteList>
-      <address>127.0.0.1</address>
-      <address>10.147.20.21</address>  <!-- kvlapblack -->
-      <address>10.147.20.30</address>  <!-- barney -->
-      <!-- Removed: hal, betty, bambam - were causing timeout lag -->
-    </interfaceWhiteList>
-    <maxInitialPeersRange>100</maxInitialPeersRange>
-  </transport_descriptor>
-</transport_descriptors>
-
-<participant profile_name="default_part_profile" is_default_profile="true">
-  <rtps>
-    <builtin>
-      <initialPeersList>
-        <!-- localhost -->
-        <locator>
-          <udpv4>
-            <address>127.0.0.1</address>
-          </udpv4>
-        </locator>
-        <!-- kvlapblack -->
-        <locator>
-          <udpv4>
-            <address>10.147.20.21</address>
-          </udpv4>
-        </locator>
-        <!-- barney itself -->
-        <locator>
-          <udpv4>
-            <address>10.147.20.30</address>
-          </udpv4>
-        </locator>
-      </initialPeersList>
-    </builtin>
-    <useBuiltinTransports>false</useBuiltinTransports>
-    <userTransports>
-      <transport_id>udp_transport</transport_id>
-    </userTransports>
-  </rtps>
-</participant>
-```
-
-### Container's Config
-**Location**: `/home/karim/grunt_docker/config/dds/fastrtps_unicast.xml`
-
-**Current config**:
-```xml
-<transport_descriptors>
-  <transport_descriptor>
-    <transport_id>udp_transport</transport_id>
-    <type>UDPv4</type>
-    <interfaceWhiteList>
-      <address>127.0.0.1</address>
-      <address>10.147.20.21</address>  <!-- kvlapblack VPN IP -->
-      <address>10.147.20.30</address>  <!-- barney VPN IP -->
-      <address>10.147.20.33</address>  <!-- wilma VPN IP -->
-      <!-- Container's actual network interfaces (from diagnostic) -->
-      <address>192.168.65.3</address>
-      <address>192.168.65.6</address>
-      <address>172.17.0.1</address>
-    </interfaceWhiteList>
-    <maxInitialPeersRange>100</maxInitialPeersRange>
-  </transport_descriptor>
-</transport_descriptors>
-
-<participant profile_name="default_part_profile" is_default_profile="true">
-  <rtps>
-    <builtin>
-      <initialPeersList>
-        <!-- localhost -->
-        <locator>
-          <udpv4>
-            <address>127.0.0.1</address>
-          </udpv4>
-        </locator>
-        <!-- kvlapblack -->
-        <locator>
-          <udpv4>
-            <address>10.147.20.21</address>
-          </udpv4>
-        </locator>
-        <!-- barney -->
-        <locator>
-          <udpv4>
-            <address>10.147.20.30</address>
-          </udpv4>
-        </locator>
-        <!-- wilma -->
-        <locator>
-          <udpv4>
-            <address>10.147.20.33</address>
-          </udpv4>
-        </locator>
-      </initialPeersList>
-    </builtin>
-    <useBuiltinTransports>false</useBuiltinTransports>
-    <userTransports>
-      <transport_id>udp_transport</transport_id>
-    </userTransports>
-  </rtps>
-</participant>
-```
-
-**Mounted via**: `compose/viz/bash.yaml`, `compose/viz/rviz.yaml`, `compose/viz/rqt.yaml`
-- Volume: `../../config/dds:/dds_config:ro`
-- Env: `FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml`
-
-## Unresolved Questions
-
-### 1. interfaceWhiteList Behavior
-
-**Question**: Does `interfaceWhiteList` control:
-- A) Only LOCAL interface binding (which NICs to use for sending/receiving)?
-- B) Both local binding AND remote peer filtering (firewall-like)?
-
-**Official Documentation** (https://fast-dds.docs.eprosima.com/en/latest/fastdds/transport/whitelist.html):
-> "Communication interfaces used by the DomainParticipants whose TransportDescriptorInterface defines an interfaceWhiteList is limited to the interfaces' addresses defined in that list"
-
-**The quote is ambiguous** - it doesn't clearly state whether non-existent local IPs should be included.
-
-**Current uncertainty**:
-- Container's whitelist includes `10.147.20.21`, `10.147.20.30`, `10.147.20.33` which **don't exist as local interfaces**
-- Docs say: "If none of the values in the transport descriptor's whitelist match the interfaces on the host, then all the interfaces in the whitelist are filtered out and therefore no communication will be established"
-- **BUT**: Does this mean each individual non-matching entry is ignored, or the whole list fails?
-
-**Arguments for "local binding only"**:
-- Would be very fragile if configured-but-offline peers break the entire network
-- FastDDS shouldn't continuously retry binding to non-existent interfaces
-
-**Arguments for "also filters remote"**:
-- Named "whitelist" suggests security/filtering function
-- Documentation mentions "limiting communication"
-
-**Empirical test needed**: Remove VPN IPs from container's whitelist, keep only actual container IPs, test if discovery still works.
-
-### 2. Why No Cross-NAT Discovery?
-
-**Theories**:
-1. **interfaceWhiteList mismatch**: Non-existent IPs causing transport to fail
-2. **Windows firewall**: Blocking inbound DDS ports from WSL2/Docker
-3. **NAT port mapping**: DDS discovery ports not properly forwarded through NAT layers
-4. **Initial peers not working**: Unicast discovery packets not routing correctly
-5. **Transport type mismatch**: Some subtle incompatibility in transport config
-
-**What we know**:
-- ✅ ICMP works (ping succeeds)
-- ✅ TCP likely works (normal internet traffic routes fine)
-- ❓ UDP ports 7400/7410/7412 - unknown if they can traverse the NAT
-- ❓ Barney receiving discovery packets from container - no visibility
-
-## Next Debugging Steps
-
-### Step 1: Test interfaceWhiteList Theory
-Edit container's `config/dds/fastrtps_unicast.xml`:
+### Container's FastRTPS Profile
+**Location**: `config/dds/fastrtps_unicast.xml`
 
 ```xml
-<interfaceWhiteList>
-  <!-- Only actual container interfaces -->
-  <address>127.0.0.1</address>
-  <address>192.168.65.3</address>
-  <address>192.168.65.6</address>
-  <address>172.17.0.1</address>
-  <!-- REMOVED: 10.147.20.21, 10.147.20.30, 10.147.20.33 -->
-</interfaceWhiteList>
-```
-
-**Keep** `initialPeersList` unchanged (still targeting VPN IPs for discovery).
-
-Test: `docker compose -f compose/viz/bash.yaml run --rm bash` → `ros2 topic list`
-
-**Expected outcomes**:
-- If it works: interfaceWhiteList is local-only, remote IPs were breaking it
-- If it fails: interfaceWhiteList wasn't the problem
-
-### Step 2: Install Network Tools in Container
-Add to base Dockerfile or test container:
-```bash
-apt-get update && apt-get install -y netcat-openbsd tcpdump
-```
-
-Then test UDP connectivity:
-```bash
-# Listen on barney
-nc -ul 9999
-
-# Send from container
-echo "test" | nc -u 10.147.20.30 9999
-```
-
-### Step 3: Packet Capture on Barney
-```bash
-# On barney, capture DDS discovery traffic
-sudo tcpdump -i any 'udp and (port 7400 or port 7410 or port 7412)' -n
-
-# In container, try to discover
-ros2 topic list
-```
-
-**Look for**: Packets from 10.147.20.21 (NAT'd container traffic) arriving at barney.
-
-### Step 4: Try CycloneDDS Instead
-FastRTPS might have NAT traversal issues. Test with CycloneDDS which has better NAT handling:
-
-```bash
-# In container
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-ros2 topic list
-```
-
-(Requires CycloneDDS to be installed in base image)
-
-### Step 5: Simplify to Minimal Config
-Create a completely minimal FastRTPS profile:
-```xml
+<?xml version="1.0" encoding="UTF-8" ?>
 <profiles xmlns="http://www.eprosima.com">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_transport</transport_id>
+      <type>UDPv4</type>
+      <interfaceWhiteList>
+        <!-- Only include interfaces that actually exist with native Docker + mirrored networking -->
+        <address>127.0.0.1</address>
+        <address>10.147.20.21</address>     <!-- ZeroTier VPN (kvlapblack) -->
+        <address>192.168.43.91</address>    <!-- Mobile hotspot -->
+        <address>172.17.0.1</address>       <!-- docker0 bridge -->
+      </interfaceWhiteList>
+      <maxInitialPeersRange>100</maxInitialPeersRange>
+    </transport_descriptor>
+  </transport_descriptors>
   <participant profile_name="default_part_profile" is_default_profile="true">
     <rtps>
       <builtin>
         <initialPeersList>
           <locator>
             <udpv4>
-              <address>10.147.20.30</address>
+              <address>127.0.0.1</address>
+            </udpv4>
+          </locator>
+          <locator>
+            <udpv4>
+              <address>10.147.20.21</address>  <!-- kvlapblack -->
+            </udpv4>
+          </locator>
+          <locator>
+            <udpv4>
+              <address>10.147.20.30</address>  <!-- barney -->
             </udpv4>
           </locator>
         </initialPeersList>
       </builtin>
+      <useBuiltinTransports>false</useBuiltinTransports>
+      <userTransports>
+        <transport_id>udp_transport</transport_id>
+      </userTransports>
     </rtps>
   </participant>
 </profiles>
 ```
 
-No custom transports, no whitelists, just "please talk to barney via unicast".
+### Barney's FastRTPS Profile
+**Location**: `/ros2_ws/src/grunt/grunt_bringup/config/fastrtps_profiles.xml` (on barney)
 
-## Diagnostic Commands
+```xml
+<interfaceWhiteList>
+  <address>127.0.0.1</address>
+  <address>10.147.20.21</address>  <!-- kvlapblack -->
+  <address>10.147.20.30</address>  <!-- barney -->
+</interfaceWhiteList>
 
-### In Container
-```bash
-# Check environment
-echo $FASTRTPS_DEFAULT_PROFILES_FILE
-cat $FASTRTPS_DEFAULT_PROFILES_FILE
-
-# Check network interfaces
-ip addr show
-
-# Check DDS ports
-ss -ulpn | grep 74
-
-# Verbose DDS logging (broken - doesn't produce output)
-export FASTDDS_VERBOSITY=info
-ros2 topic list
-
-# Test ping
-ping -c 3 10.147.20.30
-
-# Test DNS
-nslookup barney.robodojo.net
+<initialPeersList>
+  <locator>
+    <udpv4>
+      <address>127.0.0.1</address>
+    </udpv4>
+  </locator>
+  <locator>
+    <udpv4>
+      <address>10.147.20.21</address>  <!-- kvlapblack -->
+    </udpv4>
+  </locator>
+  <locator>
+    <udpv4>
+      <address>10.147.20.30</address>  <!-- barney -->
+    </udpv4>
+  </locator>
+</initialPeersList>
 ```
 
-### On Barney
+## Key Learnings
+
+### interfaceWhiteList Behavior
+**Answer**: `interfaceWhiteList` controls **local interface binding only**, not remote peer filtering.
+
+**Evidence**:
+- Including non-existent IPs (like `10.147.20.30` in container that only has `10.147.20.21`) causes transport to fail
+- Once only actual local interfaces were listed, discovery worked immediately
+- Remote peers are specified separately in `initialPeersList`
+
+**Best practice**: Only include interfaces that exist on the local machine according to `ip addr show`.
+
+### Docker Desktop vs Native Docker
+
+| Feature | Docker Desktop | Native Docker in WSL2 |
+|---------|---------------|----------------------|
+| `network_mode: host` | VM network only | True host network |
+| ZeroTier visibility | ❌ No | ✅ Yes (with mirrored networking) |
+| Performance | Extra VM overhead | Direct |
+| Setup complexity | Easy installer | Manual apt install |
+| Cross-platform | Windows/Mac/Linux | Linux only |
+
+**For ROS 2 on WSL2**: Native Docker is superior for network transparency.
+
+### Windows Firewall Impact
+- By default, Windows Firewall blocks inbound UDP on non-standard ports
+- This affects WSL2 even with mirrored networking
+- Must create explicit rules for DDS ports (7400-7500) or allow all WSL2 traffic
+- Disabling firewall entirely is not recommended for security
+
+## Troubleshooting Commands
+
+### Verify Setup
 ```bash
-# Check what's listening
+# Check ZeroTier visible in WSL2
+ip addr show | grep 10.147.20
+
+# Check ZeroTier visible in container (with native Docker + host networking)
+docker-compose -f compose/viz/bash.yaml run --rm bash
+ip addr show | grep 10.147.20
+
+# Check DDS ports listening
 ss -ulpn | grep 74
 
-# Check config
-echo $FASTRTPS_DEFAULT_PROFILES_FILE
-cat $FASTRTPS_DEFAULT_PROFILES_FILE
-
-# Packet capture
-sudo tcpdump -i any 'udp and (port 7400 or port 7410)' -n
-
-# Test local discovery
-ros2 topic list
-ros2 run demo_nodes_cpp talker
+# Check firewall rule (PowerShell as Admin)
+Get-NetFirewallRule -DisplayName "ROS 2 DDS Discovery"
 ```
 
-## Files Created
+### Debug Discovery
+```bash
+# Outbound packets from container to barney
+tcpdump -i any 'udp and dst host 10.147.20.30 and (port 7400 or port 7410 or port 7412)' -n -c 10
 
-### Compose Files
-- `compose/viz/rviz.yaml` - RViz2 with WSLg support
-- `compose/viz/rqt.yaml` - RQT with WSLg support
-- `compose/viz/bash.yaml` - Interactive debugging shell
+# Inbound packets from barney to container
+tcpdump -i any 'udp and src host 10.147.20.30 and (port 7400 or port 7410 or port 7412)' -n -c 10
 
-### Configuration
-- `config/rviz/default.rviz` - RViz window size (1200x800)
-- `config/dds/fastrtps_unicast.xml` - Custom DDS profile for container
-- `config/dds/diagnose_dds.sh` - DDS diagnostic script
-- `config/dds/test_discovery.sh` - Discovery test script
-
-### Documentation
-- `docs/wsl2-visualization.md` - WSLg setup guide
-- `docs/dds-cross-nat-troubleshooting.md` - This file
+# Test ROS 2 discovery
+ros2 daemon start
+ros2 topic list
+ros2 topic echo /chatter
+```
 
 ## References
 
+- WSL2 Mirrored Networking: https://learn.microsoft.com/en-us/windows/wsl/networking#mirrored-mode-networking
 - FastDDS Interface Whitelist: https://fast-dds.docs.eprosima.com/en/latest/fastdds/transport/whitelist.html
-- FastDDS Transport Descriptors: https://fast-dds.docs.eprosima.com/en/latest/fastdds/xml_configuration/transports.html
 - ROS 2 DDS Tuning: https://docs.ros.org/en/humble/How-To-Guides/DDS-tuning.html
+- Windows Firewall Rules: https://learn.microsoft.com/en-us/powershell/module/netsecurity/new-netfirewallrule
 
-## Open Issues for Long-Term
+## Status: ✅ RESOLVED
 
-1. **Peer list fragility**: Current FastDDS behavior of severe lag when peers are unreachable is unacceptable for production
-   - Need discovery timeout configuration
-   - Or switch to FastDDS Discovery Server mode
-   - Or use CycloneDDS with better NAT handling
-
-2. **Config management**: Need to update grunt_bringup profile in grunt repo when:
-   - New robots added to network
-   - Testing from new development machines
-   - Network topology changes
-
-3. **NAT traversal**: May need to investigate:
-   - FastDDS Discovery Server (centralized discovery)
-   - ROS 2 bridge nodes
-   - VPN directly in WSL2 (if ZeroTier supports it)
-   - Port forwarding rules in Windows firewall
+Cross-NAT DDS discovery is now working reliably with:
+- Native Docker in WSL2
+- WSL2 mirrored networking
+- Windows Firewall rules for DDS ports
+- FastRTPS unicast discovery with properly configured interface whitelists

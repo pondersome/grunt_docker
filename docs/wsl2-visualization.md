@@ -8,8 +8,21 @@ This guide covers running ROS 2 GUI tools (RViz2, RQT) in Docker containers on W
 
 ### Windows Requirements
 - **Windows 11** (WSLg is built-in on recent builds)
-- **WSL2** installed and updated
+- **WSL2** installed and updated with **mirrored networking** enabled
 - **WSLg enabled** (default on Windows 11)
+- **Native Docker in WSL2** (NOT Docker Desktop - see [setup guide](native-docker-wsl2-setup.md))
+- **Windows Firewall rule** for ROS 2 DDS ports (7400-7500)
+- **ZeroTier VPN** (or similar) if discovering topics from remote robots
+
+### Important Setup Steps
+
+**Before using these compose files**, you MUST:
+
+1. **Enable WSL2 mirrored networking** - See [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#1-enable-wsl2-mirrored-networking)
+2. **Install native Docker** - See [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#3-install-native-docker-in-wsl2)
+3. **Configure Windows Firewall** - See [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#5-configure-windows-firewall)
+
+**Why native Docker?** Docker Desktop's `network_mode: host` only refers to its internal VM, not the actual WSL2/Windows network. This breaks DDS discovery across VPN networks.
 
 ### Verify WSLg is Working
 
@@ -252,11 +265,43 @@ docker compose -f compose/viz/rviz.yaml logs
 
 ### ROS 2 Topics Not Visible
 
-**Symptom**: RViz/RQT launches but doesn't see topics from host or other containers
+**Symptom**: RViz/RQT launches but doesn't see topics from host or other containers/robots
+
+**Common causes**:
+1. Docker Desktop being used instead of native Docker
+2. WSL2 mirrored networking not enabled
+3. Windows Firewall blocking DDS ports
+4. ROS 2 daemon not started in container
 
 **Solutions**:
 
-1. **Check ROS_DOMAIN_ID matches**:
+1. **Verify native Docker** (NOT Docker Desktop):
+   ```bash
+   docker info | grep "Operating System"
+   # Should show: "Ubuntu" or similar Linux OS
+   # Docker Desktop shows: "Docker Desktop"
+   ```
+
+   If using Docker Desktop, follow [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md) to switch.
+
+2. **Check VPN visibility**:
+   ```bash
+   # Inside container
+   docker exec -it grunt_rviz bash -c 'ip addr show | grep 10.147.20'
+   # Should show your VPN IP (e.g., 10.147.20.21)
+   ```
+
+   If not visible, WSL2 mirrored networking is not enabled.
+
+3. **Check ROS 2 daemon**:
+   ```bash
+   # ROS 2 daemon may not auto-start
+   docker exec -it grunt_rviz bash
+   ros2 daemon start
+   ros2 topic list
+   ```
+
+4. **Check ROS_DOMAIN_ID matches**:
    ```bash
    # In WSL2 host
    echo $ROS_DOMAIN_ID
@@ -265,28 +310,32 @@ docker compose -f compose/viz/rviz.yaml logs
    docker exec -it grunt_rviz bash -c 'echo $ROS_DOMAIN_ID'
    ```
 
-2. **Check RMW_IMPLEMENTATION matches**:
-   ```bash
-   # Host
-   echo $RMW_IMPLEMENTATION
-
-   # Container
-   docker exec -it grunt_rviz bash -c 'echo $RMW_IMPLEMENTATION'
-   ```
-
-3. **Verify host networking**:
-   ```bash
-   docker inspect grunt_rviz | grep NetworkMode
-   # Should show: "NetworkMode": "host"
-   ```
-
-4. **Test DDS discovery**:
+5. **Test DDS connectivity**:
    ```bash
    # In container
    docker exec -it grunt_rviz bash
    source /ros2_ws/install/setup.bash
-   ros2 topic list  # Should match host's topic list
+   ros2 daemon start
+   ros2 topic list  # Should see topics from remote robots
    ```
+
+6. **Check Windows Firewall**:
+   ```powershell
+   # From PowerShell
+   Get-NetFirewallRule -DisplayName "ROS 2 DDS Discovery"
+   ```
+
+   If rule doesn't exist, see [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#5-configure-windows-firewall).
+
+7. **Debug with bash.yaml**:
+   ```bash
+   docker compose -f compose/viz/bash.yaml run --rm bash
+   # Inside container:
+   ros2 daemon start
+   bash /dds_config/diagnose_dds.sh
+   ```
+
+   See [dds-cross-nat-troubleshooting.md](dds-cross-nat-troubleshooting.md) for detailed debugging.
 
 ### Permission Denied on /mnt/wslg
 
