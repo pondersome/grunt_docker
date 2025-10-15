@@ -118,8 +118,30 @@ RUN curl -o Groot2.AppImage https://s3.us-west-1.amazonaws.com/download.behavior
 RUN echo "# Auto-source ROS 2 environment" >> /etc/bash.bashrc && \
     echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc && \
     echo "source /ros2_ws/install/setup.bash" >> /etc/bash.bashrc && \
+    echo "# Source dev workspaces if they exist" >> /etc/bash.bashrc && \
+    echo "if [ -f ~/dev_ws/install/setup.bash ]; then source ~/dev_ws/install/setup.bash; fi" >> /etc/bash.bashrc && \
+    echo "if [ -f ~/sim_ws/install/setup.bash ]; then source ~/sim_ws/install/setup.bash; fi" >> /etc/bash.bashrc && \
     echo "# Suppress daemon timeout warnings (known issue in Docker)" >> /etc/bash.bashrc && \
     echo "export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET" >> /etc/bash.bashrc
+
+# Create dev user for interactive development
+# - UID 1000 matches typical WSL2 user for bind-mount permissions
+# - Remove default ubuntu user if it exists (to avoid UID conflict)
+# - Add to sudo and video groups for GUI support
+# Note: fuse group not needed - AppImages work without it on recent systems
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupadd -g 1000 dev && \
+    useradd -m -u 1000 -g 1000 -G sudo,video -s /bin/bash dev && \
+    echo "dev:dev" | chpasswd && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create dev workspace directories with proper permissions
+RUN mkdir -p /home/dev/dev_ws /home/dev/sim_ws && \
+    chown -R dev:dev /home/dev
+
+# Copy Groot2 to dev user home (was in /root)
+RUN cp /root/Groot2.AppImage /home/dev/ && \
+    chown dev:dev /home/dev/Groot2.AppImage
 
 # Add entrypoint
 WORKDIR /ros2_ws
@@ -127,3 +149,80 @@ COPY ./base/entrypoint.sh /
 # Fix potential Windows line ending issues and make executable
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 ENTRYPOINT [ "/bin/bash", "/entrypoint.sh" ]
+
+# Default to dev user for interactive sessions
+# Compose files can override with user: root if needed
+USER dev
+WORKDIR /home/dev
+
+####################################
+# Dev Stage - Additional Dev Tools #
+####################################
+FROM base AS dev
+
+# Switch back to root for installing packages
+USER root
+
+# Install MoveIt2 - required for roarm_description and manipulation development
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-moveit \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Intel RealSense SDK (userspace libraries only)
+# Note: Skip librealsense2-dkms (kernel module) - not needed in containers
+# The host system should have the kernel module if using real hardware
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
+    && add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u \
+    && apt-get install -y --no-install-recommends \
+    librealsense2-utils \
+    librealsense2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install RealSense ROS wrapper (if available in ROS repos)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-realsense2-camera \
+    ros-${ROS_DISTRO}-realsense2-description \
+    || echo "RealSense ROS packages not available, will build from source" \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ROS 2 Control packages (for moveit_servo and manipulation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-control-toolbox \
+    ros-${ROS_DISTRO}-controller-manager \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-joint-state-broadcaster \
+    ros-${ROS_DISTRO}-joint-trajectory-controller \
+    ros-${ROS_DISTRO}-gripper-controllers \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install audio_common packages (for by_your_command voice control)
+# Note: audio_common not in Humble repos, will be built from source
+# Install its dependencies: PortAudio, ALSA
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    portaudio19-dev \
+    libasound2-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-ugly \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional MoveIt2 dependencies (optional, may not be available in all distros)
+RUN apt-get update && \
+    (apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-moveit-resources-panda-moveit-config \
+        ros-${ROS_DISTRO}-moveit-visual-tools \
+        ros-${ROS_DISTRO}-launch-pytest \
+        python3-tqdm \
+        python3-requests \
+        || echo "Some optional MoveIt2 packages not available") && \
+    rm -rf /var/lib/apt/lists/*
+
+# Switch back to dev user
+USER dev
+WORKDIR /home/dev

@@ -16,18 +16,21 @@
 
 services:
   rviz:
-    image: ghcr.io/pondersome/grunt_base:humble
-    container_name: grunt_rviz
+    image: ghcr.io/pondersome/grunt_base:${ROS_DISTRO:-humble}-dev
+    container_name: grunt_rviz_${ROS_DISTRO:-humble}
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: dev
 
     environment:
       # ROS 2 configuration
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
 
-      # FastRTPS profile for DDS communication (required for topic discovery)
-      # TEMPORARY: Commented out - restrictive whitelist blocks container networks
-      # TODO: Update grunt_bringup profile to include container/WSL2 network ranges
-      # - FASTRTPS_DEFAULT_PROFILES_FILE=/ros2_ws/install/grunt_bringup/share/grunt_bringup/config/fastrtps_profiles.xml
+      # Note: No FastRTPS profile - using default multicast for better discovery
+      # bash.yaml uses unicast profile, which may be why tf tree differs
+      # If you need unicast, uncomment:
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml
 
       # WSLg display (works with both X11 and Wayland)
       - DISPLAY=${DISPLAY}
@@ -42,14 +45,24 @@ services:
       - /mnt/wslg:/mnt/wslg:rw
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
 
-      # Mount custom RViz config (sets window size to 1200x800)
-      - ./config/rviz/default.rviz:/root/.rviz2/default.rviz:ro
+      # Development workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:rw
+
+      # Simulation workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:rw
+
+      # DDS configuration (optional, for unicast mode)
+      - ../../config/dds:/dds_config:ro
+
+      # RViz config for dev user (optional - can override with custom config)
+      # - ../../config/rviz/default.rviz:/home/dev/.rviz2/default.rviz:ro
 
     # Host networking for ROS 2 DDS discovery
     network_mode: host
 
-    # Launch RViz2 (entrypoint.sh handles ROS 2 sourcing)
-    command: ["rviz2"]
+    # Launch RViz2 with custom config from dev workspace
+    # Uses barney.rviz from your dev workspace
+    command: ["rviz2", "-d", "/home/dev/dev_ws/barney.rviz"]
 
     # No auto-restart - let container stop when RViz closes
     # restart: unless-stopped

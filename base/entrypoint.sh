@@ -19,17 +19,18 @@ set -e
 # Source ROS 2 base environment
 source /opt/ros/${ROS_DISTRO}/setup.bash
 
-# Source workspace overlays
+# Source workspace overlays in proper order
 source /ros2_ws/install/setup.bash
-# source /sim_ws/install/setup.bash  # Uncomment if using simulation workspace
 
-# Optional: Build and source development workspace
-# Uncomment these lines if you have a bind-mounted dev workspace
-#if [ -d ~/dev_ws ]; then
-#  cd ~/dev_ws
-#  colcon build --symlink-install
-#  source install/setup.bash
-#fi
+# Source development workspace if it exists and is built
+if [ -f ~/dev_ws/install/setup.bash ]; then
+  source ~/dev_ws/install/setup.bash
+fi
+
+# Source simulation workspace if it exists and is built
+if [ -f ~/sim_ws/install/setup.bash ]; then
+  source ~/sim_ws/install/setup.bash
+fi
 
 # Execute the command passed to the container
 exec "$@"

@@ -5,7 +5,8 @@
       "WebFetch(domain:docs.google.com)",
       "Bash(docker buildx:*)",
       "Bash(docker run:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": []

@@ -78,12 +78,32 @@ Uninstall Docker Desktop from Windows Settings → Apps
 
 ### 3. Install Native Docker in WSL2
 
-```bash
-# Update package list
-sudo apt-get update
+**Recommended: Docker CE (Community Edition)**
 
-# Install Docker
-sudo apt-get install -y docker.io docker-compose
+Docker CE includes the `buildx` plugin for multi-architecture builds (amd64 + arm64), which is required for building images that run on both x86_64 laptops and ARM-based robots (Jetson, Raspberry Pi).
+
+```bash
+# Remove old Docker packages if present
+sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc
+
+# Install prerequisites
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+
+# Add Docker's official GPG key
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add Docker repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker CE with plugins
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
 
 # Add your user to docker group (avoid needing sudo)
 sudo usermod -aG docker $USER
@@ -94,22 +114,94 @@ newgrp docker
 # Start Docker service
 sudo service docker start
 
-# Enable Docker to start on boot
-sudo systemctl enable docker 2>/dev/null || echo "systemd not available, start manually"
-
 # Verify installation
 docker --version
+docker compose version  # Note: 'docker compose' not 'docker-compose'
+docker buildx version
+
+# Verify Docker is running
 docker ps
 ```
 
-**For automatic Docker startup** (add to `.bashrc` or `.zshrc`):
+**Note on WSL2 systemd**: You may see a warning "Could not execute systemctl" during installation. This is expected on WSL2 without systemd and is harmless. Docker will still work correctly.
+
+**For automatic Docker startup** (add to `~/.bashrc` or `~/.zshrc`):
 
 ```bash
 # Auto-start Docker if not running
 if ! pgrep -x dockerd > /dev/null; then
-    sudo service docker start
+    sudo service docker start > /dev/null 2>&1
 fi
 ```
+
+#### Alternative: docker.io (Ubuntu Package)
+
+If you don't need multi-architecture builds:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo usermod -aG docker $USER
+newgrp docker
+sudo service docker start
+```
+
+**Limitations of docker.io**:
+- No `buildx` plugin (can't build for multiple architectures)
+- Older Docker version
+- No compose v2 plugin (must install `docker-compose` separately)
+
+**When to use docker.io**: Only for simple single-architecture development where you pull pre-built multi-arch images.
+
+### 3a. Setup Multi-Architecture Builds (Optional)
+
+If you need to build images for both x86_64 (amd64) and ARM64 (Jetson, Raspberry Pi):
+
+**1. Install QEMU for cross-platform emulation**:
+
+```bash
+# Install QEMU user-mode emulation
+sudo apt-get update
+sudo apt-get install -y qemu-user-static binfmt-support
+
+# Register QEMU handlers with Docker
+docker run --privileged --rm tonistiigi/binfmt --install all
+
+# Verify registration
+docker run --rm --privileged tonistiigi/binfmt
+# Should show: arm64, amd64, etc.
+```
+
+**2. Create a multi-platform builder**:
+
+```bash
+# Create and use a new builder instance
+docker buildx create --name multiarch --use
+
+# Verify builder supports multiple platforms
+docker buildx inspect --bootstrap
+
+# Should show platforms: linux/amd64, linux/arm64, linux/arm/v7, etc.
+```
+
+**3. Build multi-architecture images**:
+
+```bash
+# Example: Build and push for both amd64 and arm64
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --push \
+  -t ghcr.io/yourusername/grunt_base:humble \
+  -f base/Dockerfile .
+
+# Note: --push is required for multi-platform builds
+# (multi-arch images can't be loaded to local Docker cache)
+```
+
+**Performance note**: Building for ARM64 on x86_64 uses QEMU emulation and is significantly slower than native builds (10-30x slower). Consider:
+- Building overnight
+- Using GitHub Actions with native ARM runners
+- Building only when needed (not for every test)
 
 ### 4. Pull/Build Your Images
 
@@ -362,9 +454,57 @@ No changes needed! Compose files already use `network_mode: host`, which now pro
 docker pull ghcr.io/pondersome/grunt_base:humble
 
 # Or build locally
-cd ~/grunt_docker/base
-docker build -t ghcr.io/pondersome/grunt_base:humble .
+cd ~/grunt_docker
+docker build -t ghcr.io/pondersome/grunt_base:humble \
+  --build-arg ROS_DISTRO=humble \
+  --build-arg GZ_VERSION=gz-harmonic \
+  -f base/Dockerfile .
 ```
+
+### Multi-arch build fails with "unknown flag: --platform"
+
+**Problem**: `docker buildx build --platform` shows "unknown flag: --platform"
+
+**Cause**: `buildx` plugin not installed (using docker.io instead of Docker CE)
+
+**Solution**: Install Docker CE with buildx plugin (see section 3)
+
+### ARM64 build fails with QEMU error
+
+**Problem**: Building for ARM64 shows error like `.buildkit_qemu_emulator: Invalid ELF image`
+
+**Cause**: QEMU emulation not set up for cross-platform builds
+
+**Solution**:
+
+```bash
+# Install QEMU user-mode emulation
+sudo apt-get install -y qemu-user-static binfmt-support
+
+# Register QEMU with Docker
+docker run --privileged --rm tonistiigi/binfmt --install all
+
+# Verify QEMU is working
+docker run --rm --platform linux/arm64 alpine uname -m
+# Should output: aarch64
+```
+
+### Multi-arch build gets stuck or is extremely slow
+
+**Problem**: ARM64 build takes hours on x86_64 host
+
+**Explanation**: QEMU emulation is 10-30x slower than native builds. This is expected behavior.
+
+**Solutions**:
+
+1. **Be patient** - Building ROS 2 base images can take 1-3 hours for ARM64
+2. **Build overnight** or in background
+3. **Use multi-arch images from registry** instead of building locally:
+   ```bash
+   docker pull ghcr.io/pondersome/grunt_base:humble
+   # This pulls the correct architecture automatically
+   ```
+4. **Use GitHub Actions** with native ARM runners for faster builds
 
 ## Switching Back to Docker Desktop
 
@@ -415,9 +555,24 @@ Set Docker to use WSL2's native filesystem for better build performance:
 sudo docker info | grep "Docker Root Dir"
 ```
 
-## Comparison with Docker Desktop
+## Comparison: Docker Options
 
-### Advantages of Native Docker
+### Docker CE vs docker.io vs Docker Desktop
+
+| Feature | Docker CE (Recommended) | docker.io | Docker Desktop |
+|---------|------------------------|-----------|----------------|
+| Host networking | ✅ True host mode | ✅ True host mode | ❌ VM network only |
+| VPN visibility | ✅ Yes | ✅ Yes | ❌ No |
+| Buildx plugin | ✅ Included | ❌ Not included | ✅ Included |
+| Multi-arch builds | ✅ Yes | ❌ No | ✅ Yes |
+| Compose v2 | ✅ Plugin | ⚠️ Separate package | ✅ Included |
+| Docker version | Latest | Older | Latest |
+| Installation | Manual | Simple (`apt`) | GUI installer |
+| GUI dashboard | ❌ No | ❌ No | ✅ Yes |
+| Performance | Excellent | Excellent | Good (VM overhead) |
+| WSL2 integration | Native | Native | Runs in separate VM |
+
+### Advantages of Native Docker (CE or docker.io)
 
 - ✅ True host networking with `network_mode: host`
 - ✅ Direct access to VPN interfaces (with mirrored networking)
@@ -435,17 +590,25 @@ sudo docker info | grep "Docker Root Dir"
 
 ### When to Use Each
 
-**Use Native Docker for**:
+**Use Docker CE (native) for**:
 - ROS 2 development with DDS discovery across networks
+- Building multi-architecture images (amd64 + arm64)
 - VPN/ZeroTier access from containers
 - Maximum performance
-- Linux development workflows
+- Modern Docker features and plugins
+
+**Use docker.io (native) for**:
+- Simple WSL2 development without multi-arch builds
+- Pulling pre-built multi-arch images only
+- Minimal installation footprint
+- When buildx is not needed
 
 **Use Docker Desktop for**:
 - Cross-platform development (Windows/Mac/Linux)
 - Need GUI dashboard
 - Simple installation
 - Non-networking-intensive workloads
+- **Not recommended for ROS 2 with VPN networks**
 
 ## References
 
