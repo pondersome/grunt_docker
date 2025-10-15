@@ -25,7 +25,7 @@
 
 services:
   bash:
-    image: ghcr.io/pondersome/grunt_base:${ROS_DISTRO:-humble}-dev
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
     container_name: grunt_bash_${ROS_DISTRO:-humble}
     stdin_open: true
     tty: true

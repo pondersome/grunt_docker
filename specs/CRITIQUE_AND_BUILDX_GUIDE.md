@@ -115,7 +115,7 @@ FROM osrf/ros:${ROS_DISTRO}-desktop AS base
 # Build for both x86_64 and ARM64
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag pondersome/grunt_base:jazzy \
+  --tag pondersome/grunt:jazzy \
   --file base/Dockerfile \
   --push \
   .
@@ -133,8 +133,8 @@ docker buildx build \
 
 On any machine:
 ```bash
-docker pull pondersome/grunt_base:jazzy
-docker run -it pondersome/grunt_base:jazzy bash
+docker pull pondersome/grunt:jazzy
+docker run -it pondersome/grunt:jazzy bash
 
 # Docker automatically selected the right architecture!
 ```
@@ -147,13 +147,13 @@ If you want to test locally before pushing:
 # Build for ONLY your current architecture and load locally
 docker buildx build \
   --platform linux/amd64 \
-  --tag grunt_base:jazzy-local \
+  --tag grunt:jazzy-local \
   --file base/Dockerfile \
   --load \
   .
 
 # Now you can test it locally
-docker run -it grunt_base:jazzy-local bash
+docker run -it grunt:jazzy-local bash
 ```
 
 ### Advanced: Platform-Specific Logic in Dockerfile
@@ -189,7 +189,7 @@ RUN apt-get update && apt-get install -y \
 
 ```bash
 # On Betty (Jetson):
-docker build -f base/Dockerfile.jetson -t grunt_base:humble-jetson .
+docker build -f base/Dockerfile.jetson -t grunt:humble-jetson .
 ```
 
 ---
@@ -431,10 +431,10 @@ grunt_docker/
 ### Phase 4: Multi-Arch Build Setup
 13. ⬜ Set up GHCR: Create PAT, login (see Quick GHCR Setup above or `docs/ghcr-setup.md`)
 14. ⬜ Set up buildx builder: `docker buildx create --name gruntbuilder --use`
-15. ⬜ Test local build: `docker buildx build --platform linux/amd64 --load -t ghcr.io/pondersome/grunt_base:jazzy-test -f base/Dockerfile .`
-16. ⬜ First multi-arch push: `docker buildx build --platform linux/amd64,linux/arm64 --push -t ghcr.io/pondersome/grunt_base:jazzy -f base/Dockerfile .`
+15. ⬜ Test local build: `docker buildx build --platform linux/amd64 --load -t ghcr.io/pondersome/grunt:jazzy-test -f base/Dockerfile .`
+16. ⬜ First multi-arch push: `docker buildx build --platform linux/amd64,linux/arm64 --push -t ghcr.io/pondersome/grunt:jazzy -f base/Dockerfile .`
 17. ⬜ Make package public on GitHub
-18. ⬜ Test pull from another machine: `docker pull ghcr.io/pondersome/grunt_base:jazzy`
+18. ⬜ Test pull from another machine: `docker pull ghcr.io/pondersome/grunt:jazzy`
 
 ---
 
@@ -478,7 +478,7 @@ Reasons:
 
 4. **After first push, make package public**
    - Go to: https://github.com/pondersome?tab=packages
-   - Click your package (e.g., `grunt_base`)
+   - Click your package (e.g., `grunt`)
    - Settings → Change visibility → Public
 
 **See `docs/ghcr-setup.md` for detailed walkthrough with troubleshooting.**
@@ -491,16 +491,16 @@ Reasons:
 ghcr.io/pondersome/<component>:<distro>[-<variant>]
 
 Examples:
-  ghcr.io/pondersome/grunt_base:jazzy
-  ghcr.io/pondersome/grunt_base:humble
+  ghcr.io/pondersome/grunt:jazzy
+  ghcr.io/pondersome/grunt:humble
   ghcr.io/pondersome/grunt_viz:jazzy
   ghcr.io/pondersome/grunt_betty:humble-jetson
 ```
 
 Later additions (when needed):
-- Dated tags: `grunt_base:jazzy-20250108`
-- Semver: `grunt_base:v0.1.0`
-- Latest pointer: `grunt_base:latest` → `jazzy`
+- Dated tags: `grunt:jazzy-20250108`
+- Semver: `grunt:v0.1.0`
+- Latest pointer: `grunt:latest` → `jazzy`
 
 ---
 
@@ -535,14 +535,14 @@ docker buildx inspect gruntbuilder --bootstrap
 docker buildx build \
   --platform linux/amd64 \
   --load \
-  -t ghcr.io/pondersome/grunt_base:jazzy-test \
+  -t ghcr.io/pondersome/grunt:jazzy-test \
   -f base/Dockerfile .
 
 # Multi-arch push to GHCR
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --push \
-  -t ghcr.io/pondersome/grunt_base:jazzy \
+  -t ghcr.io/pondersome/grunt:jazzy \
   -f base/Dockerfile .
 
 # Multi-arch with build args
@@ -551,7 +551,7 @@ docker buildx build \
   --build-arg ROS_DISTRO=humble \
   --build-arg GZ_VERSION=gz-garden \
   --push \
-  -t ghcr.io/pondersome/grunt_base:humble \
+  -t ghcr.io/pondersome/grunt:humble \
   -f base/Dockerfile .
 
 # Build specific stage from multi-stage Dockerfile
@@ -566,8 +566,8 @@ docker buildx build \
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --push \
-  -t ghcr.io/pondersome/grunt_base:jazzy \
-  -t pondersome/grunt_base:jazzy \
+  -t ghcr.io/pondersome/grunt:jazzy \
+  -t pondersome/grunt:jazzy \
   -f base/Dockerfile .
 ```
 

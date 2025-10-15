@@ -162,7 +162,7 @@ cd /home/karim/grunt_docker
 docker buildx build \
   --platform linux/amd64 \
   --load \
-  -t ghcr.io/pondersome/grunt_base:test \
+  -t ghcr.io/pondersome/grunt:test \
   -f base/Dockerfile \
   .
 ```
@@ -172,7 +172,7 @@ docker buildx build \
 ### 4.2 Test the Image Locally
 
 ```bash
-docker run -it --rm ghcr.io/pondersome/grunt_base:test bash
+docker run -it --rm ghcr.io/pondersome/grunt:test bash
 
 # Inside container, test ROS 2 is working:
 ros2 topic list
@@ -185,12 +185,12 @@ exit
 ### 4.3 Push to GHCR
 
 ```bash
-docker push ghcr.io/pondersome/grunt_base:test
+docker push ghcr.io/pondersome/grunt:test
 ```
 
 **Expected output:**
 ```
-The push refers to repository [ghcr.io/pondersome/grunt_base]
+The push refers to repository [ghcr.io/pondersome/grunt]
 a1b2c3d4e5f6: Pushed
 ...
 test: digest: sha256:abc123... size: 8710 # Size will vary
@@ -220,7 +220,7 @@ By default, GHCR packages are **private**. To make them public (required for fre
 
 ### 5.2 Find Your Package
 
-You should see: `grunt_base` (or whatever you named your image)
+You should see: `grunt` (or whatever you named your image)
 
 Click on it.
 
@@ -251,21 +251,21 @@ Now the package will show up on your repo's main page!
 
 ```bash
 # Remove local image
-docker rmi ghcr.io/pondersome/grunt_base:test
+docker rmi ghcr.io/pondersome/grunt:test
 
 # Pull from GHCR (no login required for public images!)
-docker pull ghcr.io/pondersome/grunt_base:test
+docker pull ghcr.io/pondersome/grunt:test
 
 # Run it
-docker run -it --rm ghcr.io/pondersome/grunt_base:test bash
+docker run -it --rm ghcr.io/pondersome/grunt:test bash
 ```
 
 ### On Another Machine (e.g., Betty Jetson)
 
 ```bash
 # No login needed for public images!
-docker pull ghcr.io/pondersome/grunt_base:test
-docker run -it --rm ghcr.io/pondersome/grunt_base:test bash
+docker pull ghcr.io/pondersome/grunt:test
+docker run -it --rm ghcr.io/pondersome/grunt:test bash
 ```
 
 ---
@@ -284,7 +284,7 @@ docker buildx create --name gruntbuilder --use
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --push \
-  -t ghcr.io/pondersome/grunt_base:jazzy \
+  -t ghcr.io/pondersome/grunt:jazzy \
   --build-arg ROS_DISTRO=jazzy \
   --build-arg GZ_VERSION=gz-harmonic \
   -f base/Dockerfile \
@@ -297,21 +297,21 @@ docker buildx build \
 
 ```bash
 # Inspect the manifest list
-docker buildx imagetools inspect ghcr.io/pondersome/grunt_base:jazzy
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy
 ```
 
 Expected output:
 ```
-Name:      ghcr.io/pondersome/grunt_base:jazzy
+Name:      ghcr.io/pondersome/grunt:jazzy
 MediaType: application/vnd.docker.distribution.manifest.list.v2+json
 Digest:    sha256:abc123...
 
 Manifests:
-  Name:      ghcr.io/pondersome/grunt_base:jazzy@sha256:def456...
+  Name:      ghcr.io/pondersome/grunt:jazzy@sha256:def456...
   MediaType: application/vnd.docker.distribution.manifest.v2+json
   Platform:  linux/amd64
 
-  Name:      ghcr.io/pondersome/grunt_base:jazzy@sha256:ghi789...
+  Name:      ghcr.io/pondersome/grunt:jazzy@sha256:ghi789...
   MediaType: application/vnd.docker.distribution.manifest.v2+json
   Platform:  linux/arm64
 ```
@@ -382,7 +382,7 @@ docker buildx build --platform linux/amd64,linux/arm64 --push ...
 **Solution:**
 ```bash
 # Check what platforms were built:
-docker buildx imagetools inspect ghcr.io/pondersome/grunt_base:jazzy
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy
 
 # Rebuild with correct --platform flag:
 docker buildx build --platform linux/amd64,linux/arm64 ...
@@ -448,18 +448,18 @@ docker buildx prune -a
 **For development:**
 ```bash
 # Use descriptive test tags
--t ghcr.io/pondersome/grunt_base:test
--t ghcr.io/pondersome/grunt_base:jazzy-test
--t ghcr.io/pondersome/grunt_base:jazzy-20250108
+-t ghcr.io/pondersome/grunt:test
+-t ghcr.io/pondersome/grunt:jazzy-test
+-t ghcr.io/pondersome/grunt:jazzy-20250108
 ```
 
 **For releases:**
 ```bash
 # Semantic versioning
--t ghcr.io/pondersome/grunt_base:v0.1.0
--t ghcr.io/pondersome/grunt_base:v0.1
--t ghcr.io/pondersome/grunt_base:v0
--t ghcr.io/pondersome/grunt_base:latest
+-t ghcr.io/pondersome/grunt:v0.1.0
+-t ghcr.io/pondersome/grunt:v0.1
+-t ghcr.io/pondersome/grunt:v0
+-t ghcr.io/pondersome/grunt:latest
 ```
 
 ### 3. Cleaning Up Old Versions
@@ -482,7 +482,7 @@ For grunt_docker (public images), anonymous pulls are fine. But if you hit limit
 ```bash
 # Pull with auth (uses your higher limit)
 echo $GITHUB_PAT | docker login ghcr.io -u pondersome --password-stdin
-docker pull ghcr.io/pondersome/grunt_base:jazzy
+docker pull ghcr.io/pondersome/grunt:jazzy
 ```
 
 ---
@@ -508,21 +508,21 @@ docker pull ghcr.io/pondersome/grunt_base:jazzy
 echo $GITHUB_PAT | docker login ghcr.io -u pondersome --password-stdin
 
 # Build + push single arch (local testing)
-docker buildx build --platform linux/amd64 --load -t ghcr.io/pondersome/grunt_base:test -f base/Dockerfile .
-docker push ghcr.io/pondersome/grunt_base:test
+docker buildx build --platform linux/amd64 --load -t ghcr.io/pondersome/grunt:test -f base/Dockerfile .
+docker push ghcr.io/pondersome/grunt:test
 
 # Build + push multi-arch (production)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --push \
-  -t ghcr.io/pondersome/grunt_base:jazzy \
+  -t ghcr.io/pondersome/grunt:jazzy \
   -f base/Dockerfile .
 
 # Inspect multi-arch manifest
-docker buildx imagetools inspect ghcr.io/pondersome/grunt_base:jazzy
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy
 
 # Pull (no auth needed for public)
-docker pull ghcr.io/pondersome/grunt_base:jazzy
+docker pull ghcr.io/pondersome/grunt:jazzy
 
 # Logout
 docker logout ghcr.io

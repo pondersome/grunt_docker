@@ -191,7 +191,7 @@ docker buildx inspect --bootstrap
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --push \
-  -t ghcr.io/yourusername/grunt_base:humble \
+  -t ghcr.io/yourusername/grunt:humble \
   -f base/Dockerfile .
 
 # Note: --push is required for multi-platform builds
@@ -209,11 +209,11 @@ Since native Docker has a separate image cache:
 
 ```bash
 # Pull pre-built images
-docker pull ghcr.io/pondersome/grunt_base:humble
+docker pull ghcr.io/pondersome/grunt:humble
 
 # Or build from scratch
 cd ~/grunt_docker/base
-docker build -t ghcr.io/pondersome/grunt_base:humble .
+docker build -t ghcr.io/pondersome/grunt:humble .
 ```
 
 ### 5. Configure Windows Firewall
@@ -346,7 +346,7 @@ No changes needed! Compose files already use `network_mode: host`, which now pro
 2. Check you're using native Docker, not Docker Desktop: `docker info | grep "Operating System"`
    - Should show "Ubuntu" or similar Linux OS
    - Docker Desktop shows "Docker Desktop"
-3. Try running without compose: `docker run --network host --rm -it ghcr.io/pondersome/grunt_base:humble bash`
+3. Try running without compose: `docker run --network host --rm -it ghcr.io/pondersome/grunt:humble bash`
 
 ### DDS discovery doesn't work
 
@@ -451,11 +451,11 @@ No changes needed! Compose files already use `network_mode: host`, which now pro
 
 ```bash
 # Pull from registry
-docker pull ghcr.io/pondersome/grunt_base:humble
+docker pull ghcr.io/pondersome/grunt:humble
 
 # Or build locally
 cd ~/grunt_docker
-docker build -t ghcr.io/pondersome/grunt_base:humble \
+docker build -t ghcr.io/pondersome/grunt:humble \
   --build-arg ROS_DISTRO=humble \
   --build-arg GZ_VERSION=gz-harmonic \
   -f base/Dockerfile .
@@ -501,7 +501,7 @@ docker run --rm --platform linux/arm64 alpine uname -m
 2. **Build overnight** or in background
 3. **Use multi-arch images from registry** instead of building locally:
    ```bash
-   docker pull ghcr.io/pondersome/grunt_base:humble
+   docker pull ghcr.io/pondersome/grunt:humble
    # This pulls the correct architecture automatically
    ```
 4. **Use GitHub Actions** with native ARM runners for faster builds

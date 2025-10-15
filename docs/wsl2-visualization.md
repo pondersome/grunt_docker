@@ -55,7 +55,7 @@ docker compose -f compose/viz/rviz.yaml up
 
 RViz2 should launch in a native Windows window via WSLg.
 
-**First time?** Docker will pull `ghcr.io/pondersome/grunt_base:humble` (multi-arch, ~1.2GB compressed).
+**First time?** Docker will pull `ghcr.io/pondersome/grunt:humble` (multi-arch, ~1.2GB compressed).
 
 ### Run RQT
 
@@ -385,7 +385,7 @@ docker compose -f compose/viz/viz-stack.yaml up
 **Pre-pull images**:
 
 ```bash
-docker pull ghcr.io/pondersome/grunt_base:humble
+docker pull ghcr.io/pondersome/grunt:humble
 ```
 
 ### Monitor Resource Usage
@@ -395,7 +395,7 @@ docker pull ghcr.io/pondersome/grunt_base:humble
 docker stats grunt_rviz grunt_rqt
 
 # Check image size
-docker images ghcr.io/pondersome/grunt_base
+docker images ghcr.io/pondersome/grunt
 ```
 
 ---

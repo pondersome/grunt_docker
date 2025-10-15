@@ -168,6 +168,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-moveit \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Navigation2 (Nav2) - autonomous navigation stack
+# Provides path planning, behavior trees, collision avoidance, and map management
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-navigation2 \
+    ros-${ROS_DISTRO}-nav2-bringup \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Intel RealSense SDK (userspace libraries only)
 # Note: Skip librealsense2-dkms (kernel module) - not needed in containers
 # The host system should have the kernel module if using real hardware
