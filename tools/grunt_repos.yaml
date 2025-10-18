@@ -1,0 +1,21 @@
+repositories:
+  grunt:
+    type: git
+    url: https://github.com/pondersome/grunt.git
+    version: main
+  roarm_ws_em0:
+    type: git
+    url: https://github.com/pondersome/roarm_ws_em0.git
+    version: feature/mobility
+  audio_common:
+    type: git
+    url: https://github.com/pondersome/audio_common.git
+    version: main
+  by_your_command:
+    type: git
+    url: https://github.com/pondersome/by_your_command.git
+    version: main
+  realsense-ros:
+    type: git
+    url: https://github.com/pondersome/realsense-ros.git
+    version: ros2-master

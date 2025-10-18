@@ -8,11 +8,10 @@ This guide covers running ROS 2 GUI tools (RViz2, RQT) in Docker containers on W
 
 ### Windows Requirements
 - **Windows 11** (WSLg is built-in on recent builds)
-- **WSL2** installed and updated with **mirrored networking** enabled
+- **WSL2** installed and updated (`wsl --update`)
 - **WSLg enabled** (default on Windows 11)
 - **Native Docker in WSL2** (NOT Docker Desktop - see [setup guide](native-docker-wsl2-setup.md))
-- **Windows Firewall rule** for ROS 2 DDS ports (7400-7500)
-- **ZeroTier VPN** (or similar) if discovering topics from remote robots
+- **ZeroTier VPN** (or similar) for robot network access - see [ZeroTier Setup Options](#zerotier-setup-options)
 
 ### Important Setup Steps
 
@@ -40,6 +39,78 @@ echo $PULSE_SERVER      # Should show: /mnt/wslg/PulseServer
 ```
 
 If these are empty or `/mnt/wslg/` doesn't exist, see [Troubleshooting](#troubleshooting-wslg-not-available).
+
+---
+
+## ZeroTier Setup Options
+
+For cross-network robot communication, ZeroTier (or similar VPN) is required. There are **two valid approaches**:
+
+### Option A: Mirrored Networking (Recommended if it works)
+
+**How it works:**
+- ZeroTier installed on **Windows host**
+- WSL2 **mirrored networking** enabled in `.wslconfig`
+- WSL2 VM sees Windows network interfaces directly
+- Containers inherit network via `network_mode: host`
+
+**Setup:**
+1. Install ZeroTier on Windows
+2. Join your ZeroTier network
+3. Enable mirrored networking - see [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#1-enable-wsl2-mirrored-networking)
+4. Configure Windows Firewall for DDS ports - see [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md#5-configure-windows-firewall)
+
+**Verification:**
+```bash
+# From WSL2
+ip addr | grep zt
+# Should show ZeroTier interface from Windows
+```
+
+### Option B: ZeroTier in WSL2 (Alternative if Option A fails)
+
+**How it works:**
+- ZeroTier installed **directly in WSL2 VM**
+- WSL2 gets its own ZeroTier IP (separate from Windows)
+- No mirrored networking required
+- Containers inherit network via `network_mode: host`
+
+**Setup:**
+1. Install ZeroTier in WSL2:
+   ```bash
+   curl -s https://install.zerotier.com | sudo bash
+   sudo zerotier-cli join <your-network-id>
+   ```
+
+2. Authorize the WSL2 node on ZeroTier Central
+
+3. Verify:
+   ```bash
+   sudo zerotier-cli listnetworks
+   ifconfig | grep zt
+   ```
+
+4. **Optional**: Give your WSL2 node a DNS name (e.g., `halbuntu.robodojo.net`)
+
+**Advantages:**
+- Works when mirrored networking doesn't route traffic
+- WSL2 VM has independent VPN identity
+- No Windows Firewall configuration needed (VPN traffic bypasses it)
+
+**Disadvantages:**
+- ZeroTier needs to be managed in each WSL2 distribution
+- Separate IP from Windows host
+
+### Which Option to Choose?
+
+**Try Option A first** (mirrored networking) as it's simpler and uses a single VPN connection.
+
+**Fall back to Option B** if:
+- Mirrored networking fails to route traffic to internet
+- You want independent VPN identity for WSL2
+- You prefer managing network at WSL2 level
+
+Both options work with the same compose files - containers use `network_mode: host` in both cases.
 
 ---
 
@@ -209,6 +280,27 @@ In RQT:
    # PowerShell as Administrator
    wsl --update --web-download
    ```
+
+### GUI Apps Slow to Launch or Hang
+
+**Symptom**: GUI applications take 20+ seconds to open window, generate errors, or hang
+
+**Solution**: Update WSL2 to latest version
+
+```powershell
+# In PowerShell (Windows host)
+wsl --update
+wsl --shutdown
+```
+
+Then restart your WSL2 distribution. This fixes known WSLg rendering issues in older WSL2 versions.
+
+**Verification**:
+```bash
+# From WSL2
+wsl.exe --version
+# Should show recent version (0.51.0+)
+```
 
 ### X11 Fallback (If Wayland Fails)
 

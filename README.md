@@ -230,24 +230,42 @@ Images use a **three-tier workspace layering convention**:
 - Built inside container with `colcon build`
 - Persists across container restarts
 
-**Example workspace setup**:
+**Setup workspace with automated script**:
 
 ```bash
-# On WSL2 host, create distro-specific workspaces
-mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
-mkdir -p ~/ros2/jazzy/{dev_ws,sim_ws}/src
+# Run the workspace setup script (clones standard repos)
+./tools/setup-dev-workspace.sh humble
 
-# Clone your development repos
-cd ~/ros2/humble/dev_ws/src
-git clone https://github.com/pondersome/grunt.git
-git clone https://github.com/pondersome/roarm_ws_em0.git
-# ... other repos
+# Or for Jazzy
+./tools/setup-dev-workspace.sh jazzy
 
 # Build inside container
-docker compose -f compose/viz/bash.yaml up
+docker compose -f compose/viz/bash.yaml run --rm bash
 # Inside container:
 cd ~/dev_ws
 colcon build --symlink-install
+```
+
+The script uses `vcstool` to clone repositories defined in `tools/grunt_repos.yaml`:
+- `grunt` - Core platform packages
+- `roarm_ws_em0` - Arm manipulation (feature/mobility branch)
+- `audio_common` - Audio processing
+- `by_your_command` - Voice control
+- `realsense-ros` - RealSense camera wrapper (ros2-master branch)
+
+To add or modify repositories, edit `tools/grunt_repos.yaml`.
+
+**Manual workspace setup** (if you prefer):
+
+```bash
+# Create distro-specific workspaces
+mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
+mkdir -p ~/ros2/jazzy/{dev_ws,sim_ws}/src
+
+# Clone your development repos manually
+cd ~/ros2/humble/dev_ws/src
+git clone https://github.com/pondersome/grunt.git
+# ... other repos
 ```
 
 ### Sourcing Order
@@ -292,8 +310,10 @@ All compose files are located in `compose/viz/` and support multi-distro via env
 | File | Purpose | DDS Mode | GUI |
 |------|---------|----------|-----|
 | `bash.yaml` | Interactive debug shell | Unicast | Yes (WSLg) |
+| `bash-multicast.yaml` | Interactive debug shell | Multicast | Yes (WSLg) |
 | `rviz.yaml` | RViz2 visualization | Multicast | Yes (WSLg) |
 | `rqt.yaml` | RQT GUI tools | Multicast | Yes (WSLg) |
+| `viz-combined.yaml` | RViz + RQT together | Multicast | Yes (WSLg) |
 
 ### Common Features
 
@@ -307,15 +327,31 @@ All compose files:
 ### Example Usage
 
 ```bash
-# Default Humble
+# Launch RViz only
 docker compose -f compose/viz/rviz.yaml up
 
-# Override to Jazzy
-ROS_DISTRO=jazzy docker compose -f compose/viz/rviz.yaml up
+# Launch RQT only
+docker compose -f compose/viz/rqt.yaml up
 
-# Multiple containers simultaneously
-docker compose -f compose/viz/bash.yaml -f compose/viz/rviz.yaml up
+# Launch both RViz and RQT (combined - recommended)
+docker compose -f compose/viz/viz-combined.yaml up
+
+# Launch both RViz and RQT (separate containers)
+docker compose -f compose/viz/rviz.yaml -f compose/viz/rqt.yaml up
+
+# Interactive bash with multicast DDS (local network)
+docker compose -f compose/viz/bash-multicast.yaml run --rm bash
+
+# Interactive bash with unicast DDS (cross-VPN/NAT)
+docker compose -f compose/viz/bash.yaml run --rm bash
+
+# Override to Jazzy
+ROS_DISTRO=jazzy docker compose -f compose/viz/viz-combined.yaml up
 ```
+
+**DDS Mode Selection:**
+- **Multicast** (rviz, rqt, bash-multicast, viz-combined): Best for local networks (same WiFi/Ethernet)
+- **Unicast** (bash): Required for cross-VPN/NAT scenarios with explicit peer configuration
 
 ---
 
@@ -350,8 +386,10 @@ grunt_docker/
 ├── compose/
 │   └── viz/                    # Visualization containers (WSL2)
 │       ├── bash.yaml           # Interactive shell (unicast DDS)
+│       ├── bash-multicast.yaml # Interactive shell (multicast DDS)
 │       ├── rviz.yaml           # RViz2 (multicast DDS)
-│       └── rqt.yaml            # RQT (multicast DDS)
+│       ├── rqt.yaml            # RQT (multicast DDS)
+│       └── viz-combined.yaml   # RViz + RQT together (multicast)
 │
 ├── config/
 │   ├── dds/
@@ -360,6 +398,8 @@ grunt_docker/
 │       └── default.rviz          # Default RViz config
 │
 ├── docs/
+│   ├── docker-commands-cheatsheet.md  # Docker command reference
+│   ├── dev-workflow.md         # Dev layer pattern guide
 │   ├── ghcr-setup.md           # GHCR authentication & buildx
 │   ├── native-docker-wsl2-setup.md  # Docker CE installation
 │   ├── wsl2-visualization.md   # WSLg troubleshooting
@@ -368,6 +408,10 @@ grunt_docker/
 ├── specs/
 │   ├── grunt_docker_prd_v_0.md  # Product Requirements Doc
 │   └── CRITIQUE_AND_BUILDX_GUIDE.md  # Architecture analysis
+│
+├── tools/
+│   ├── setup-dev-workspace.sh  # Automated workspace setup script
+│   └── grunt_repos.yaml        # Standard Grunt development repositories
 │
 └── README.md                   # This file
 ```

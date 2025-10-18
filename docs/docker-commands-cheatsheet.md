@@ -180,14 +180,36 @@ ROS_DOMAIN_ID=42 docker compose -f compose/viz/rviz.yaml up
 ROS_DISTRO=jazzy ROS_DOMAIN_ID=42 docker compose -f compose/viz/rviz.yaml up
 ```
 
+### Visualization Services
+
+```bash
+# Launch RViz only
+docker compose -f compose/viz/rviz.yaml up
+
+# Launch RQT only
+docker compose -f compose/viz/rqt.yaml up
+
+# Launch both RViz and RQT (combined container - recommended)
+docker compose -f compose/viz/viz-combined.yaml up
+
+# Launch both RViz and RQT (separate containers)
+docker compose -f compose/viz/rviz.yaml -f compose/viz/rqt.yaml up
+
+# Interactive bash with multicast DDS (local network)
+docker compose -f compose/viz/bash-multicast.yaml run --rm bash
+
+# Interactive bash with unicast DDS (cross-VPN/NAT)
+docker compose -f compose/viz/bash.yaml run --rm bash
+```
+
 ### Multiple Services
 
 ```bash
 # Start multiple services simultaneously
 docker compose -f compose/viz/bash.yaml -f compose/viz/rviz.yaml up
 
-# Start all services in compose/viz/
-docker compose -f compose/viz/bash.yaml -f compose/viz/rviz.yaml -f compose/viz/rqt.yaml up
+# Combined viz with bash (multicast)
+docker compose -f compose/viz/bash-multicast.yaml -f compose/viz/viz-combined.yaml up
 ```
 
 ### Service-Specific Operations
@@ -505,17 +527,18 @@ cd ~/dev_ws
 colcon build --symlink-install
 source install/setup.bash
 
-# 4. (In another terminal) Launch RViz
-docker compose -f compose/viz/rviz.yaml up
+# 4. (In another terminal) Launch RViz and RQT
+docker compose -f compose/viz/viz-combined.yaml up
 
-# 5. (In another terminal) Launch RQT
+# Or launch separately
+docker compose -f compose/viz/rviz.yaml up
 docker compose -f compose/viz/rqt.yaml up
 
-# 6. (In container) Test your nodes
+# 5. (In container) Test your nodes
 ros2 launch my_package my_launch.py
 
-# 7. When done, stop all containers
-docker compose -f compose/viz/bash.yaml -f compose/viz/rviz.yaml -f compose/viz/rqt.yaml down
+# 6. When done, stop all containers
+docker compose -f compose/viz/bash-multicast.yaml -f compose/viz/viz-combined.yaml down
 ```
 
 ### Build and Push New Image

@@ -1,0 +1,71 @@
+# Interactive Bash Shell with Multicast DDS
+#
+# PURPOSE: Development and debugging tool using multicast DDS (same as RViz/RQT).
+#          Use this when on the same local network (WiFi/Ethernet).
+#          For cross-VPN/NAT scenarios, use bash.yaml with unicast.
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/viz/bash-multicast.yaml run --rm bash
+#
+# Once inside, you must start the ROS 2 daemon manually:
+#   ros2 daemon start
+#
+# Then you can:
+#   - Test DDS discovery: ros2 topic list, ros2 node list
+#   - Launch GUI tools: rviz2, rqt
+#   - Debug network issues: ss -ulpn | grep 74, tcpdump
+#
+# Differences from bash.yaml:
+#   - Uses default multicast DDS (no explicit peer configuration)
+#   - Better discovery on local networks
+#   - Same DDS mode as rviz.yaml and rqt.yaml
+
+services:
+  bash:
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
+    container_name: grunt_bash_${ROS_DISTRO:-humble}
+    stdin_open: true
+    tty: true
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: dev
+
+    environment:
+      # ROS 2 configuration
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
+      # Note: No FastRTPS profile - using default multicast for better local discovery
+      # This matches the DDS mode used by rviz.yaml and rqt.yaml
+      # For cross-VPN/NAT use bash.yaml with unicast profile instead
+
+      # WSLg display (works with both X11 and Wayland)
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+
+      # PulseAudio for audio feedback
+      - PULSE_SERVER=${PULSE_SERVER:-/mnt/wslg/PulseServer}
+
+    volumes:
+      # WSLg sockets
+      - /mnt/wslg:/mnt/wslg:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+
+      # DDS configuration for cross-VPN discovery
+      - ../../config/dds:/dds_config:ro
+
+      # Development workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:rw
+
+      # Simulation workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:rw
+
+      # RViz config for dev user
+      - ../../config/rviz/default.rviz:/home/dev/.rviz2/default.rviz:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Interactive bash shell
+    command: ["/bin/bash"]

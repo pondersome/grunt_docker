@@ -255,7 +255,7 @@ Get-NetFirewallRule -DisplayName "ROS 2 DDS Discovery"
 
 ```bash
 # Start a container with host networking
-docker-compose -f compose/viz/bash.yaml run --rm bash
+docker compose -f compose/viz/bash.yaml run --rm bash
 
 # Inside container - verify VPN is visible
 ip addr show | grep "10.147.20"
@@ -293,8 +293,6 @@ With native Docker + mirrored networking, container interfaces change. Update `c
   <!-- Include only interfaces that exist in the container -->
   <address>127.0.0.1</address>
   <address>10.147.20.21</address>     <!-- Your VPN IP -->
-  <address>192.168.X.X</address>      <!-- Your WiFi/Ethernet IP -->
-  <address>172.17.0.1</address>       <!-- docker0 bridge -->
 </interfaceWhiteList>
 ```
 

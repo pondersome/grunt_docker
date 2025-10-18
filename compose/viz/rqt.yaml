@@ -59,8 +59,10 @@ services:
     # Host networking for ROS 2 DDS discovery
     network_mode: host
 
-    # Launch RQT (entrypoint.sh handles ROS 2 sourcing)
-    command: ["rqt"]
+    # Launch RQT with perspective from grunt package
+    # After cloning workspace, this will use the version-controlled perspective
+    # Falls back to default if workspace isn't cloned or perspective doesn't exist
+    command: ["rqt", "--perspective-file", "/home/dev/dev_ws/src/grunt/grunt_util/config/barney.perspective"]
 
     # No auto-restart - let container stop when RQT closes
     # restart: unless-stopped

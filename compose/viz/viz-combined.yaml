@@ -1,0 +1,96 @@
+# Combined Visualization Container (RViz + RQT in one container)
+#
+# PURPOSE: Launch both RViz and RQT from a single container.
+#          More efficient than separate containers when always used together.
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/viz/viz-combined.yaml up
+#
+# This launches both:
+#   - RViz2 with barney.rviz configuration
+#   - RQT with barney.perspective configuration
+#
+# Advantages over separate containers:
+#   - Single container startup (faster)
+#   - Shared memory space (more efficient)
+#   - Less Docker overhead
+#   - Simpler to manage (one up/down command)
+#
+# Disadvantages:
+#   - Both tools restart together if one crashes
+#   - Can't restart one without restarting both
+#   - Slightly less flexible for debugging individual tools
+#
+# Platform Support:
+#   - WSL2 with WSLg (primary focus, Wayland GUI via /mnt/wslg)
+#   - Native Ubuntu 22.04/24.04 (Wayland by default, X11 fallback available)
+
+services:
+  viz:
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
+    container_name: grunt_viz_${ROS_DISTRO:-humble}
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: dev
+
+    environment:
+      # ROS 2 configuration
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
+      # Note: No FastRTPS profile - using default multicast for better discovery
+      # For cross-VPN/NAT scenarios, use separate containers with unicast
+
+      # WSLg display (works with both X11 and Wayland)
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+
+      # PulseAudio for audio feedback
+      - PULSE_SERVER=${PULSE_SERVER:-/mnt/wslg/PulseServer}
+
+    volumes:
+      # WSLg sockets
+      - /mnt/wslg:/mnt/wslg:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+
+      # Development workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:rw
+
+      # Simulation workspace (bind-mounted from WSL2)
+      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:rw
+
+      # DDS configuration (optional, for unicast mode)
+      - ../../config/dds:/dds_config:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Launch both RViz and RQT using a wrapper script
+    # This runs both processes in the background and waits for either to exit
+    command:
+      - /bin/bash
+      - -c
+      - |
+        # Source ROS environment (entrypoint already did this, but be explicit)
+        source /opt/ros/${ROS_DISTRO}/setup.bash
+        source /ros2_ws/install/setup.bash
+        [ -f ~/dev_ws/install/setup.bash ] && source ~/dev_ws/install/setup.bash
+        [ -f ~/sim_ws/install/setup.bash ] && source ~/sim_ws/install/setup.bash
+
+        # Launch RViz in background
+        rviz2 -d /home/dev/dev_ws/src/grunt/grunt_util/config/barney.rviz &
+        RVIZ_PID=$!
+
+        # Launch RQT in background
+        rqt --perspective-file /home/dev/dev_ws/src/grunt/grunt_util/config/barney.perspective &
+        RQT_PID=$!
+
+        # Wait for either process to exit
+        # When one exits, kill the other and exit container
+        wait -n
+        kill $RVIZ_PID $RQT_PID 2>/dev/null
+        exit 0
+
+    # No auto-restart - let container stop when tools close
+    # restart: unless-stopped

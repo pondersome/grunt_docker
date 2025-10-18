@@ -22,7 +22,7 @@
              Include: localhost, ZeroTier VPN, and docker bridge at minimum. -->
         <address>127.0.0.1</address>        <!-- localhost (always required) -->
         <address>10.147.20.21</address>     <!-- ZeroTier VPN (kvlapblack) -->
-        <address>172.17.0.1</address>       <!-- docker0 bridge -->
+	      <address>10.147.20.22</address>     <!-- ZeroTier VPN (halbuntu) -->
       </interfaceWhiteList>
       <maxInitialPeersRange>100</maxInitialPeersRange>
     </transport_descriptor>

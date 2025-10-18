@@ -69,9 +69,10 @@ services:
     # Host networking for ROS 2 DDS discovery
     network_mode: host
 
-    # Launch RViz2 with custom config from dev workspace
-    # Uses barney.rviz from your dev workspace
-    command: ["rviz2", "-d", "/home/dev/dev_ws/barney.rviz"]
+    # Launch RViz2 with config from grunt package
+    # After building workspace, this will use the version-controlled config
+    # Falls back to default if workspace isn't built or config doesn't exist
+    command: ["rviz2", "-d", "/home/dev/dev_ws/src/grunt/grunt_util/config/barney.rviz"]
 
     # No auto-restart - let container stop when RViz closes
     # restart: unless-stopped
