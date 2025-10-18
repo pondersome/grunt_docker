@@ -8,15 +8,33 @@ This repository provides Docker images and compose configurations for running RO
 
 ## Quick Start
 
+### Fresh WSL2 Setup
+
+**New to this project?** Start here:
+
+**[Getting Started: Fresh WSL2 Setup](docs/getting-started-wsl2.md)**
+
+This comprehensive guide walks through the complete setup process (30-45 minutes):
+- WSL2 installation and configuration
+- Native Docker Engine setup
+- ZeroTier VPN configuration (two approaches)
+- Workspace setup with automated script
+- GUI verification and testing
+- Cross-network robot communication
+
+**Already have WSL2 + Docker setup?** Continue below for quick commands.
+
+---
+
+### Quick Commands (Existing Setup)
+
 > **Note**: This guide currently focuses on **Windows 11 + WSL2** as the primary development platform. The containers also work on **native Ubuntu Linux** and **cloud instances** - those configurations just use standard Docker practices without WSLg. See [Platform Support](#platform-support) below.
 
-### Prerequisites (WSL2)
-
-- **WSL2 with Ubuntu 24.04** (Windows 11)
-- **Docker CE** (native Docker in WSL2, not Docker Desktop)
-  - See [docs/native-docker-wsl2-setup.md](docs/native-docker-wsl2-setup.md) for installation
-- **WSLg** enabled (GUI support via Wayland)
-- **ZeroTier VPN** installed on WSL2 (for robot network access)
+**Prerequisites:**
+- WSL2 with Ubuntu 22.04/24.04 (Windows 11)
+- Docker CE (native Docker in WSL2, not Docker Desktop)
+- WSLg enabled (GUI support via Wayland)
+- ZeroTier VPN installed (on Windows or in WSL2)
 
 ### Launch RViz2
 
@@ -420,11 +438,20 @@ grunt_docker/
 
 ## Documentation
 
-- **[docs/docker-commands-cheatsheet.md](docs/docker-commands-cheatsheet.md)** - Quick reference for all Docker, buildx, and compose commands
-- **[docs/native-docker-wsl2-setup.md](docs/native-docker-wsl2-setup.md)** - Docker CE installation on WSL2 (required for `buildx` and multi-arch builds)
+### Getting Started
+
+- **[docs/getting-started-wsl2.md](docs/getting-started-wsl2.md)** - **START HERE**: Complete WSL2 setup guide (30-45 min)
+- **[docs/native-docker-wsl2-setup.md](docs/native-docker-wsl2-setup.md)** - Docker CE installation details (referenced by getting-started)
 - **[docs/wsl2-visualization.md](docs/wsl2-visualization.md)** - WSLg troubleshooting, DDS configuration, ZeroTier setup
+
+### Workflow & Operations
+
+- **[docs/docker-commands-cheatsheet.md](docs/docker-commands-cheatsheet.md)** - Quick reference for all Docker, buildx, and compose commands
 - **[docs/dev-workflow.md](docs/dev-workflow.md)** - Dev layer pattern, workspace management, and development workflow
 - **[docs/ghcr-setup.md](docs/ghcr-setup.md)** - GitHub Container Registry authentication and multi-arch build workflow
+
+### Planning
+
 - **[docs/ROADMAP.md](docs/ROADMAP.md)** - Implementation roadmap and acceptance criteria
 - **[specs/grunt_docker_prd_v_0.md](specs/grunt_docker_prd_v_0.md)** - Product Requirements Document with detailed architecture
 
