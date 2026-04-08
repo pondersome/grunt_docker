@@ -60,6 +60,7 @@ RUN apt install -y libgflags-dev \
     ros-${ROS_DISTRO}-rviz2 \
     ros-${ROS_DISTRO}-actuator-msgs \
     ros-${ROS_DISTRO}-vision-msgs \
+    ros-${ROS_DISTRO}-foxglove-bridge \
     python3-pip
 #RUN pip install --break-system-packages setuptools==58.2.0
 RUN pip3 install $([ "${ROS_DISTRO}" = "jazzy" ] && echo "--break-system-packages" || echo "") setuptools==58.2.0
@@ -94,11 +95,17 @@ RUN /opt/venv/bin/vcs import < dependencies.repos
 #RUN mkdir -p /ros2_ws/src/grunt/grunt_description/launch
 #RUN mkdir -p /ros2_ws/src/grunt/grunt_util/config
 
+# Skip packages that need dependencies not available in base stage
+RUN touch /ros2_ws/src/roarm_ws_em0/src/roarm_else/COLCON_IGNORE && \
+    touch /ros2_ws/src/roarm_ws_em0/src/roarm_main/roarm_web_app/COLCON_IGNORE && \
+    touch /ros2_ws/src/roarm_ws_em0/src/roarm_main/moveit_servo/COLCON_IGNORE
+
 # Build the base Colcon workspace, installing dependencies first.
 WORKDIR /ros2_ws
 RUN bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash \
   && apt-get update -y \
-  && /opt/venv/bin/rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y --skip-keys='rviz' \
+  && /opt/venv/bin/rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
+     --skip-keys='rviz warehouse_ros_mongo librealsense2' \
   && /opt/venv/bin/colcon build --symlink-install"
 
 # Download Groot2 AppImage and place it in the home folder.
@@ -175,17 +182,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-nav2-bringup \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Intel RealSense SDK (userspace libraries only)
-# Note: Skip librealsense2-dkms (kernel module) - not needed in containers
-# The host system should have the kernel module if using real hardware
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
-    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
-    && add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u \
-    && apt-get install -y --no-install-recommends \
-    librealsense2-utils \
-    librealsense2-dev \
+# Install RealSense SDK (userspace libraries only, no DKMS kernel module in containers)
+# Key changed after Intel→realsenseai transition (July 2025)
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+    && gpg --keyserver keyserver.ubuntu.com --recv-key FB0B24895113F120 \
+    && gpg --export FB0B24895113F120 > /etc/apt/keyrings/librealsense.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/librealsense.gpg] https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" \
+       > /etc/apt/sources.list.d/librealsense.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends librealsense2-utils librealsense2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install RealSense ROS wrapper (if available in ROS repos)

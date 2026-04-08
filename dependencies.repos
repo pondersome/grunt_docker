@@ -1,14 +1,31 @@
 repositories:
 
-  # Base chassis repo
+  # Base chassis repo (includes p2os_msgs, p2os_urdf)
   p2os2:
     type: git
     url: https://github.com/pondersome/p2os2.git
     version: main
 
-  # grunt repositories
+  # Grunt robot config (bringup, description, util)
   grunt:
     type: git
     url: https://github.com/pondersome/grunt.git
     version: main
-  
+
+  # RTK GPS (ublox_msgs, rtcm_msgs, ntrip_client)
+  RTK_GPS_NTRIP:
+    type: git
+    url: https://github.com/pondersome/RTK_GPS_NTRIP.git
+    version: ntrip-rate-control
+
+  # RoArm (roarm_description, roarm_moveit msgs/srvs)
+  roarm_ws_em0:
+    type: git
+    url: https://github.com/pondersome/roarm_ws_em0.git
+    version: feature/mobility
+
+  # RealSense camera (msgs and description for rviz, full node for dev)
+  realsense-ros:
+    type: git
+    url: https://github.com/realsenseai/realsense-ros.git
+    version: ros2-development
