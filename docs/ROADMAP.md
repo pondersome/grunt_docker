@@ -419,8 +419,8 @@ From [PRD Section 14](../specs/grunt_docker_prd_v_0.md#14-acceptance-criteria-v0
 ## 🗂️ Repository Restructuring (When Ready)
 
 ### Migration Tasks
-- [ ] Move `dependencies.repos` → `base/dependencies.repos`
-  - Update Dockerfile COPY path
+- [x] Move `dependencies.repos` → `base/dependencies.repos` (2026-07-04)
+  - Dockerfile COPY path updated; legacy `bashrc_custom` removed
 
 - [ ] Create directory structure matching PRD Section 5
   - `compose/` (already exists in plan)

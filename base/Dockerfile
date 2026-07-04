@@ -26,8 +26,8 @@ RUN pip3 install $([ "${ROS_DISTRO}" = "jazzy" ] && echo "--break-system-package
 RUN apt-get update && apt-get install -y --no-install-recommends \
  ros-${ROS_DISTRO}-rmw-cyclonedds-cpp
 
-# Choose RMW. Since this an environment variable, it can be changed at runtime (see bashrc_custom), 
-# but needs to be the same for all particpating systems
+# Choose RMW. Since this an environment variable, it can be changed at runtime,
+# but needs to be the same for all participating systems
 # ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Install GZ Sim (binary install: https://gazebosim.org/docs/garden/install_ubuntu)
@@ -86,7 +86,7 @@ RUN if [ "${ROS_DISTRO}" = "humble" ]; then pip install 'empy<4.0'; fi
 RUN rosdep init || echo "rosdep already initialized"
 RUN rosdep update
 
-COPY dependencies.repos .
+COPY base/dependencies.repos ./dependencies.repos
 # Use the vcs from the virtual environment
 RUN /opt/venv/bin/vcs import < dependencies.repos
 
