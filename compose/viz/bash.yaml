@@ -25,8 +25,8 @@
 
 services:
   bash:
-    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
-    container_name: grunt_bash_${ROS_DISTRO:-humble}
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-jazzy}-dev
+    container_name: grunt_bash_${ROS_DISTRO:-jazzy}
     stdin_open: true
     tty: true
 
@@ -59,10 +59,10 @@ services:
       - ../../config/dds:/dds_config:ro
 
       # Development workspace (bind-mounted from WSL2)
-      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:rw
+      - ~/ros2/${ROS_DISTRO:-jazzy}/dev_ws:/home/dev/dev_ws:rw
 
       # Simulation workspace (bind-mounted from WSL2)
-      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:rw
+      - ~/ros2/${ROS_DISTRO:-jazzy}/sim_ws:/home/dev/sim_ws:rw
 
       # RViz config for dev user
       - ../../config/rviz/default.rviz:/home/dev/.rviz2/default.rviz:ro

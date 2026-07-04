@@ -31,9 +31,9 @@ services:
   bridge:
     # Use grunt dev image with foxglove-bridge installed via apt
     # Package: ros-${ROS_DISTRO}-foxglove-bridge
-    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-jazzy}-dev
 
-    container_name: foxglove_bridge_${ROS_DISTRO:-humble}
+    container_name: foxglove_bridge_${ROS_DISTRO:-jazzy}
 
     # Run as dev user (UID 1000, matches WSL2 user)
     user: "1000:1000"
@@ -60,10 +60,10 @@ services:
       - ../../config/dds:/dds_config:ro
 
       # Development workspace (for custom message types)
-      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:ro
+      - ~/ros2/${ROS_DISTRO:-jazzy}/dev_ws:/home/dev/dev_ws:ro
 
       # Simulation workspace (for custom message types)
-      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:ro
+      - ~/ros2/${ROS_DISTRO:-jazzy}/sim_ws:/home/dev/sim_ws:ro
 
     # Host networking for ROS 2 DDS discovery
     network_mode: host

@@ -16,6 +16,19 @@ repositories:
     url: https://github.com/pondersome/by_your_command.git
     version: main
   realsense-ros:
+    # Upstream moved Intel -> realsenseai (July 2025); the pondersome fork's
+    # tf_prefix change was merged upstream, so track upstream directly (matches barney)
     type: git
-    url: https://github.com/pondersome/realsense-ros.git
-    version: ros2-master
+    url: https://github.com/realsenseai/realsense-ros.git
+    version: ros2-development
+  vizanti:
+    # Web mission planner / viz. Actively developed - always built from dev_ws,
+    # never baked into images
+    type: git
+    url: https://github.com/pondersome/vizanti.git
+    version: ros2
+  rws:
+    # ROS WebSocket server - faster rosbridge-protocol alternative for vizanti
+    type: git
+    url: https://github.com/v-kiniv/rws.git
+    version: jazzy

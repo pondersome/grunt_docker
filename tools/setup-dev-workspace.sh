@@ -8,16 +8,16 @@
 #   ./tools/setup-dev-workspace.sh [DISTRO]
 #
 # Arguments:
-#   DISTRO    ROS distribution (humble or jazzy), defaults to humble
+#   DISTRO    ROS distribution (humble or jazzy), defaults to jazzy
 #
 # Example:
-#   ./tools/setup-dev-workspace.sh humble
 #   ./tools/setup-dev-workspace.sh jazzy
+#   ./tools/setup-dev-workspace.sh humble
 
 set -e  # Exit on error
 
 # Configuration
-DISTRO="${1:-humble}"
+DISTRO="${1:-jazzy}"
 WORKSPACE_ROOT="$HOME/ros2/${DISTRO}/dev_ws"
 GITHUB_USER="pondersome"
 

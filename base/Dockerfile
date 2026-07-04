@@ -98,7 +98,8 @@ RUN /opt/venv/bin/vcs import < dependencies.repos
 WORKDIR /ros2_ws
 RUN bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash \
   && apt-get update -y \
-  && /opt/venv/bin/rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y --skip-keys='rviz' \
+  && /opt/venv/bin/rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
+     --skip-keys='rviz l2lidar_node grunt_behaviors isr_wifi' \
   && /opt/venv/bin/colcon build --symlink-install"
 
 # Download Groot2 AppImage and place it in the home folder.
@@ -175,14 +176,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-nav2-bringup \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Intel RealSense SDK (userspace libraries only)
+# Install RealSense SDK (userspace libraries only)
 # Note: Skip librealsense2-dkms (kernel module) - not needed in containers
 # The host system should have the kernel module if using real hardware
+# RealSense spun out of Intel (July 2025): repo moved to librealsense.realsenseai.com
+# with a new signing key; the old librealsense.intel.com repo fails GPG verification
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
-    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE \
-    && add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u \
+    apt-transport-https ca-certificates \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc \
+       | gpg --dearmor -o /etc/apt/keyrings/librealsenseai.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo $(lsb_release -cs) main" \
+       > /etc/apt/sources.list.d/librealsense.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
     librealsense2-utils \
     librealsense2-dev \
@@ -217,7 +223,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-ugly \
+    pulseaudio-utils \
+    libasound2-plugins \
+    python3-pyaudio \
     && rm -rf /var/lib/apt/lists/*
+# pulseaudio-utils + libasound2-plugins (ALSA->Pulse bridge) let PortAudio-based
+# nodes reach WSLg's PulseAudio server (/mnt/wslg/PulseServer) for hal audio in/out
 
 # Install additional MoveIt2 dependencies (optional, may not be available in all distros)
 RUN apt-get update && \
@@ -234,6 +245,14 @@ RUN apt-get update && \
 # Provides WebSocket server on port 8765 for Foxglove Studio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-foxglove-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
+# Vizanti runtime dependencies (vizanti itself builds in dev_ws - it is under
+# active development and is never baked into images)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-rosbridge-suite \
+    python3-flask \
+    python3-waitress \
     && rm -rf /var/lib/apt/lists/*
 
 # Switch back to dev user
