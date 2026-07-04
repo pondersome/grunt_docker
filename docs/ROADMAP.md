@@ -1,7 +1,7 @@
 # grunt_docker Implementation Roadmap
 
-**Status**: v0.1 - Phase 1 Complete (WSL2 Visualization + Dev Layer)
-**Last Updated**: 2025-10-14
+**Status**: v0.1 - Phases 1 & 2 Complete; Jazzy-first since April 2026 (barney on Ubuntu 24.04 + Jazzy)
+**Last Updated**: 2026-07-04
 
 This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md) vision. Tasks are organized by priority and dependencies.
 
@@ -32,8 +32,8 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 - [x] `compose/viz/rviz.yaml` - RViz2 with WSLg, multicast DDS
 - [x] `compose/viz/rqt.yaml` - RQT with WSLg, multicast DDS
 - [x] `compose/viz/bash.yaml` - Interactive shell with unicast DDS
-- [x] Multi-distro support via `${ROS_DISTRO:-humble}` in all compose files
-- [x] Workspace bind-mounts (`~/ros2/{humble,jazzy}/{dev_ws,sim_ws}`)
+- [x] Multi-distro support via `${ROS_DISTRO:-jazzy}` in all compose files (default flipped from humble to jazzy)
+- [x] Workspace bind-mounts (`~/ros2/{jazzy,humble}/{dev_ws,sim_ws}`)
 
 ### Documentation
 - [x] Create `docs/ghcr-setup.md` (GHCR auth, buildx workflow, troubleshooting)
@@ -56,10 +56,17 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 - [x] Test with ZeroTier VPN across networks
 
 ### Images Published
-- [x] `ghcr.io/pondersome/grunt:jazzy` (base stage, multi-arch)
-- [x] `ghcr.io/pondersome/grunt:humble` (base stage, multi-arch)
-- [ ] `ghcr.io/pondersome/grunt:humble-dev` (dev stage, built locally, pending push)
-- [ ] `ghcr.io/pondersome/grunt:jazzy-dev` (dev stage, pending build/push)
+- [x] `ghcr.io/pondersome/grunt:jazzy` (base stage, multi-arch, rebuilt 2026-07-04)
+- [x] `ghcr.io/pondersome/grunt:jazzy-dev` (dev stage, multi-arch, rebuilt 2026-07-04)
+- [x] `ghcr.io/pondersome/grunt:humble` (base stage, multi-arch, legacy)
+- [ ] `ghcr.io/pondersome/grunt:humble-dev` (dev stage, built locally, pending push, legacy)
+
+### Jazzy Migration & Image Refresh (2026-07-04)
+- [x] Barney migrated to Ubuntu 24.04 + ROS 2 Jazzy (April 2026); compose files and Dockerfile now default to `jazzy`
+- [x] Multi-arch `grunt:jazzy` + `grunt:jazzy-dev` rebuilt 2026-07-04 using the realsenseai apt repo (Intel repo retired); realsense-ros now tracked from realsenseai upstream
+- [x] Runtime Python fix: `/opt/venv` built with `--system-site-packages`
+- [x] Vizanti off-robot compose service added (`compose/vizanti/server.yaml` + `docs/vizanti-setup.md`)
+- [x] Foxglove Bridge healthcheck fixed: TCP connect check `bash -c 'exec 3<>/dev/tcp/localhost/8765'` (plain curl false-fails on the WebSocket port)
 
 ---
 
@@ -72,9 +79,9 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
   - WSLg/Wayland mounts (`/mnt/wslg`)
   - Environment variables (WAYLAND_DISPLAY, XDG_RUNTIME_DIR, PULSE_SERVER)
   - network_mode: host for DDS discovery
-  - Uses `ghcr.io/pondersome/grunt:humble-dev`
-  - Multi-distro support via `${ROS_DISTRO:-humble}`
-  - Workspace bind-mounts (`~/ros2/{humble,jazzy}/{dev_ws,sim_ws}`)
+  - Uses `ghcr.io/pondersome/grunt:jazzy-dev`
+  - Multi-distro support via `${ROS_DISTRO:-jazzy}`
+  - Workspace bind-mounts (`~/ros2/{jazzy,humble}/{dev_ws,sim_ws}`)
 
 - [x] Create `compose/viz/rqt.yaml`
   - Similar WSLg setup as RViz
@@ -157,7 +164,7 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 
 - [x] Test multi-distro workflow
   - Compose files work with both Humble and Jazzy
-  - `${ROS_DISTRO:-humble}` override mechanism verified
+  - `${ROS_DISTRO:-jazzy}` override mechanism verified
 
 ### Known Issues
 - [ ] RViz frame rate slow on WSLg (Wayland rendering overhead)
@@ -179,10 +186,9 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
   - Health check configured
   - Persistent restart policy for monitoring
 
-- [ ] Create `compose/viz/vizanti.yaml` (Deferred)
-  - Determine if needs custom image or can use existing
-  - Expose web port (8080 or similar)
-  - Configure for ROS 2 topic access
+- [x] Create `compose/vizanti/server.yaml` (off-robot Vizanti web server, 2026-07-04)
+  - Previously deferred; now implemented
+  - See `docs/vizanti-setup.md` for setup and usage
 
 ### Documentation
 - [x] Create `docs/foxglove-setup.md`
@@ -271,7 +277,7 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 ### Prerequisites
 - [ ] Test `ghcr.io/pondersome/grunt:humble` on Betty (ARM64 pull)
 - [ ] Verify NVIDIA Container Toolkit on Betty
-- [ ] Confirm JetPack 6.2 compatibility
+- [ ] Confirm JetPack 6.2 compatibility (Betty stays on Humble for now; Jazzy planned with JetPack 7)
 
 ### Jetson-Specific Images
 - [ ] Decide: Separate Dockerfile vs ARG TARGETARCH conditionals
@@ -307,8 +313,8 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 
 ### Robot Documentation
 - [ ] Create `docs/robots/barney.md`
-  - x86_64 NUC specs
-  - Native ROS 2 Humble install
+  - x86_64 N100 specs
+  - Native ROS 2 Jazzy install (Ubuntu 24.04, migrated from Humble April 2026)
   - No containerization (current state)
   - Link to main grunt repo for details
 
@@ -438,12 +444,12 @@ From [PRD Section 14](../specs/grunt_docker_prd_v_0.md#14-acceptance-criteria-v0
 ## 🏷️ Image Tagging Strategy
 
 ### Current (Published)
-- `ghcr.io/pondersome/grunt:humble` (base stage, multi-arch: x86_64 + ARM64)
-- `ghcr.io/pondersome/grunt:jazzy` (base stage, multi-arch: x86_64 + ARM64)
+- `ghcr.io/pondersome/grunt:jazzy` (base stage, multi-arch: x86_64 + ARM64, rebuilt 2026-07-04)
+- `ghcr.io/pondersome/grunt:jazzy-dev` (dev stage, multi-arch: x86_64 + ARM64, rebuilt 2026-07-04)
+- `ghcr.io/pondersome/grunt:humble` (base stage, multi-arch: x86_64 + ARM64, legacy)
 
 ### Current (Local, Pending Push)
-- `ghcr.io/pondersome/grunt:humble-dev` (dev stage, multi-arch)
-- `ghcr.io/pondersome/grunt:jazzy-dev` (dev stage, pending build)
+- `ghcr.io/pondersome/grunt:humble-dev` (dev stage, multi-arch, legacy)
 
 ### Planned
 - `ghcr.io/pondersome/grunt_viz:jazzy` (RViz/RQT-specific image, if needed)

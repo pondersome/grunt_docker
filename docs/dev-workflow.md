@@ -24,8 +24,8 @@ The `base/Dockerfile` uses a **two-stage build**:
 
 ```
 ┌─────────────────────────────────────────┐
-│ Base Stage (grunt:humble)          │
-│ - ROS 2 Humble/Jazzy Desktop            │
+│ Base Stage (grunt:jazzy)          │
+│ - ROS 2 Jazzy/Humble Desktop            │
 │ - Gazebo Harmonic                        │
 │ - Core dependencies (Cyclone DDS, etc.) │
 │ - /ros2_ws from dependencies.repos      │
@@ -33,7 +33,7 @@ The `base/Dockerfile` uses a **two-stage build**:
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
-│ Dev Stage (grunt:humble-dev)       │
+│ Dev Stage (grunt:jazzy-dev)       │
 │ + MoveIt2 (manipulation)                 │
 │ + Nav2 (navigation)                      │
 │ + RealSense SDK (perception)            │
@@ -94,7 +94,7 @@ In containerized development, there are two types of dependencies:
 ### Three-Tier Structure
 
 ```
-/opt/ros/humble/                    ← Layer 1: ROS Base (immutable)
+/opt/ros/jazzy/                    ← Layer 1: ROS Base (immutable)
     └── setup.bash
 
 /ros2_ws/                           ← Layer 2: External Dependencies (immutable)
@@ -137,18 +137,18 @@ Later workspaces **overlay** earlier ones, allowing you to override packages.
 
 ### Distro-Specific Workspaces
 
-To support both Humble and Jazzy, use **distro-specific workspace directories** on the host:
+To support both Jazzy and legacy Humble, use **distro-specific workspace directories** on the host:
 
 ```
 ~/ros2/
-├── humble/
+├── jazzy/
 │   ├── dev_ws/
 │   │   ├── src/          ← Clone repos here
 │   │   ├── build/
 │   │   └── install/
 │   └── sim_ws/
 │       └── src/
-└── jazzy/
+└── humble/
     ├── dev_ws/
     │   ├── src/          ← Same repos, different distro
     │   ├── build/
@@ -159,28 +159,28 @@ To support both Humble and Jazzy, use **distro-specific workspace directories** 
 
 ### Compose File Integration
 
-Compose files use `${ROS_DISTRO:-humble}` to mount the correct workspace:
+Compose files use `${ROS_DISTRO:-jazzy}` to mount the correct workspace:
 
 ```yaml
 volumes:
   # Development workspace (bind-mounted from WSL2)
-  - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:rw
+  - ~/ros2/${ROS_DISTRO:-jazzy}/dev_ws:/home/dev/dev_ws:rw
 
   # Simulation workspace (bind-mounted from WSL2)
-  - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:rw
+  - ~/ros2/${ROS_DISTRO:-jazzy}/sim_ws:/home/dev/sim_ws:rw
 ```
 
 ### Switching Distros
 
 ```bash
-# Default: Humble
+# Default: Jazzy
 docker compose -f compose/viz/bash.yaml up
 
-# Override to Jazzy
-ROS_DISTRO=jazzy docker compose -f compose/viz/bash.yaml up
+# Override to legacy Humble
+ROS_DISTRO=humble docker compose -f compose/viz/bash.yaml up
 ```
 
-The same source code in `~/ros2/jazzy/dev_ws/src/` gets built against Jazzy dependencies.
+The same source code in `~/ros2/humble/dev_ws/src/` gets built against Humble dependencies.
 
 ---
 
@@ -192,21 +192,21 @@ The same source code in `~/ros2/jazzy/dev_ws/src/` gets built against Jazzy depe
 
 ```bash
 # On WSL2 host
-mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
 mkdir -p ~/ros2/jazzy/{dev_ws,sim_ws}/src
+mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
 ```
 
 #### 2. Clone Development Repos
 
 ```bash
-cd ~/ros2/humble/dev_ws/src
+cd ~/ros2/jazzy/dev_ws/src
 
 # Core packages
 git clone https://github.com/pondersome/grunt.git
 git clone https://github.com/pondersome/roarm_ws_em0.git
 
 # Perception
-git clone -b ros2 https://github.com/IntelRealSense/realsense-ros.git
+git clone -b ros2-development https://github.com/realsenseai/realsense-ros.git
 
 # Voice control
 git clone https://github.com/pondersome/by_your_command.git
@@ -218,7 +218,7 @@ git clone https://github.com/pondersome/audio_common.git
 #### 3. Pull Dev Image
 
 ```bash
-docker pull ghcr.io/pondersome/grunt:humble-dev
+docker pull ghcr.io/pondersome/grunt:jazzy-dev
 ```
 
 ### Daily Development Loop
@@ -249,11 +249,11 @@ source install/setup.bash
 
 **On Windows**:
 - Use VSCode, Sublime, or any editor
-- Files are in `\\wsl$\Ubuntu\home\<username>\ros2\humble\dev_ws\src\`
+- Files are in `\\wsl$\Ubuntu\home\<username>\ros2\jazzy\dev_ws\src\`
 
 **On WSL2**:
 - Use vim, nano, or VSCode with WSL Remote extension
-- Files are in `~/ros2/humble/dev_ws/src/`
+- Files are in `~/ros2/jazzy/dev_ws/src/`
 
 **File permissions**: Because container runs as `dev` (UID 1000) and your WSL2 user is typically UID 1000, file ownership is correct on both sides.
 
@@ -321,9 +321,9 @@ Rebuild and push image:
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t ghcr.io/pondersome/grunt:humble-dev \
+  -t ghcr.io/pondersome/grunt:jazzy-dev \
   --push \
   -f base/Dockerfile .
 ```
@@ -335,8 +335,8 @@ For quick testing only:
 ```bash
 # Inside container
 sudo apt-get update
-sudo apt-get install ros-humble-your-package-name
-source /opt/ros/humble/setup.bash
+sudo apt-get install ros-jazzy-your-package-name
+source /opt/ros/jazzy/setup.bash
 ```
 
 **Warning**: This will be lost when container stops. Use Option A for permanent changes.
@@ -347,7 +347,7 @@ If you need a package not in apt repos:
 
 ```bash
 # On host
-cd ~/ros2/humble/dev_ws/src
+cd ~/ros2/jazzy/dev_ws/src
 git clone https://github.com/org/your_package.git
 
 # Inside container
@@ -463,7 +463,7 @@ If you have multiple robots (Barney, Betty, BamBam), you can use **separate work
 #### Option A: Separate Workspaces
 
 ```
-~/ros2/humble/
+~/ros2/jazzy/
 ├── dev_ws/          ← General development
 ├── barney_ws/       ← Barney-specific packages
 └── betty_ws/        ← Betty-specific packages
@@ -474,7 +474,7 @@ Update compose files to mount different workspaces.
 #### Option B: Git Branches
 
 ```bash
-# In ~/ros2/humble/dev_ws/src/grunt/
+# In ~/ros2/jazzy/dev_ws/src/grunt/
 git checkout barney    # Barney config
 git checkout betty     # Betty config
 git checkout main      # Shared code
@@ -490,8 +490,8 @@ Create `.devcontainer/devcontainer.json` in your workspace:
 
 ```json
 {
-  "name": "ROS 2 Humble Dev",
-  "image": "ghcr.io/pondersome/grunt:humble-dev",
+  "name": "ROS 2 Jazzy Dev",
+  "image": "ghcr.io/pondersome/grunt:jazzy-dev",
   "workspaceMount": "source=${localWorkspaceFolder},target=/home/dev/dev_ws,type=bind",
   "workspaceFolder": "/home/dev/dev_ws",
   "remoteUser": "dev",
@@ -505,7 +505,7 @@ Create `.devcontainer/devcontainer.json` in your workspace:
     "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}"
   },
   "runArgs": ["--network=host"],
-  "postCreateCommand": "source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash",
+  "postCreateCommand": "source /opt/ros/jazzy/setup.bash && source /ros2_ws/install/setup.bash",
   "extensions": [
     "ms-vscode.cpptools",
     "ms-python.python",
@@ -522,7 +522,7 @@ Then open workspace in VSCode and click "Reopen in Container".
 
 ### 1. Keep Source Code on Host
 
-**Always** clone repos on the host filesystem (`~/ros2/humble/dev_ws/src/`), not inside the container. This ensures:
+**Always** clone repos on the host filesystem (`~/ros2/jazzy/dev_ws/src/`), not inside the container. This ensures:
 - Code persists across container restarts
 - You can edit with host tools
 - Version control works normally
@@ -544,9 +544,9 @@ If you run `rosdep install` or `apt-get install` in a container, those changes a
 
 ### 4. One Distro Per Workspace
 
-Don't mix Humble and Jazzy in the same workspace. Use separate directories:
-- `~/ros2/humble/dev_ws/`
+Don't mix Jazzy and Humble in the same workspace. Use separate directories:
 - `~/ros2/jazzy/dev_ws/`
+- `~/ros2/humble/dev_ws/`
 
 ### 5. Commit Workspace Changes Carefully
 
@@ -567,10 +567,10 @@ When modifying the Dockerfile, test both architectures:
 
 ```bash
 # Build locally for native arch
-docker build --build-arg ROS_DISTRO=humble --target dev -t grunt:humble-dev-test .
+docker build --build-arg ROS_DISTRO=jazzy --target dev -t grunt:jazzy-dev-test .
 
 # Test it
-docker run -it --rm grunt:humble-dev-test bash
+docker run -it --rm grunt:jazzy-dev-test bash
 
 # Only push after verifying
 docker buildx build --platform linux/amd64,linux/arm64 --push ...

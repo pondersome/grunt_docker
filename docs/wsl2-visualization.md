@@ -126,7 +126,7 @@ docker compose -f compose/viz/rviz.yaml up
 
 RViz2 should launch in a native Windows window via WSLg.
 
-**First time?** Docker will pull `ghcr.io/pondersome/grunt:humble` (multi-arch, ~1.2GB compressed).
+**First time?** Docker will pull `ghcr.io/pondersome/grunt:jazzy` (multi-arch, ~1.2GB compressed).
 
 ### Run RQT
 
@@ -234,7 +234,7 @@ In a separate terminal, publish a test transform:
 
 ```bash
 # From WSL2 (host or another container)
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map base_link
 ```
 
@@ -477,7 +477,7 @@ docker compose -f compose/viz/viz-stack.yaml up
 **Pre-pull images**:
 
 ```bash
-docker pull ghcr.io/pondersome/grunt:humble
+docker pull ghcr.io/pondersome/grunt:jazzy
 ```
 
 ### Monitor Resource Usage
@@ -494,7 +494,7 @@ docker images ghcr.io/pondersome/grunt
 
 ## Alternative: Native ROS 2 Install on WSL2
 
-If Docker overhead is too high, consider native ROS 2 Humble install on WSL2:
+If Docker overhead is too high, consider native ROS 2 Jazzy install on WSL2:
 
 **Pros**:
 - No containerization overhead
@@ -506,7 +506,7 @@ If Docker overhead is too high, consider native ROS 2 Humble install on WSL2:
 - Harder to manage dependencies
 - Not portable to other robots
 
-See [ROS 2 Humble Ubuntu install guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html).
+See [ROS 2 Jazzy Ubuntu install guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
 
 ---
 

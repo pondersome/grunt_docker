@@ -21,50 +21,41 @@ Quick reference for common Docker, buildx, and compose commands used in this pro
 ### Build Single Architecture (Local Testing)
 
 ```bash
-# Build base stage for Humble (x86_64 only)
+# Build base stage for Jazzy (x86_64 only)
 docker build \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target base \
-  -t grunt:humble \
+  -t grunt:jazzy \
   -f base/Dockerfile .
 
-# Build dev stage for Humble (x86_64 only)
-docker build \
-  --build-arg ROS_DISTRO=humble \
-  --target dev \
-  -t grunt:humble-dev \
-  -f base/Dockerfile .
-
-# Build Jazzy dev stage
+# Build dev stage for Jazzy (x86_64 only)
 docker build \
   --build-arg ROS_DISTRO=jazzy \
   --target dev \
   -t grunt:jazzy-dev \
+  -f base/Dockerfile .
+
+# Build legacy Humble dev stage
+docker build \
+  --build-arg ROS_DISTRO=humble \
+  --target dev \
+  -t grunt:humble-dev \
   -f base/Dockerfile .
 ```
 
 ### Build Multi-Architecture (buildx)
 
 ```bash
-# Build and push multi-arch base stage (Humble)
+# Build and push multi-arch base stage (Jazzy)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target base \
-  -t ghcr.io/pondersome/grunt:humble \
+  -t ghcr.io/pondersome/grunt:jazzy \
   --push \
   -f base/Dockerfile .
 
-# Build and push multi-arch dev stage (Humble)
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
-  --target dev \
-  -t ghcr.io/pondersome/grunt:humble-dev \
-  --push \
-  -f base/Dockerfile .
-
-# Build multi-arch for Jazzy
+# Build and push multi-arch dev stage (Jazzy)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --build-arg ROS_DISTRO=jazzy \
@@ -73,12 +64,21 @@ docker buildx build \
   --push \
   -f base/Dockerfile .
 
+# Build multi-arch for legacy Humble
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg ROS_DISTRO=humble \
+  --target dev \
+  -t ghcr.io/pondersome/grunt:humble-dev \
+  --push \
+  -f base/Dockerfile .
+
 # Build locally without pushing (load to local Docker)
 docker buildx build \
   --platform linux/amd64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t grunt:humble-dev \
+  -t grunt:jazzy-dev \
   --load \
   -f base/Dockerfile .
 ```
@@ -92,14 +92,14 @@ docker buildx build \
 ### Pull Images
 
 ```bash
-# Pull base image (Humble)
-docker pull ghcr.io/pondersome/grunt:humble
+# Pull base image (Jazzy)
+docker pull ghcr.io/pondersome/grunt:jazzy
 
-# Pull dev image (Humble)
-docker pull ghcr.io/pondersome/grunt:humble-dev
-
-# Pull Jazzy dev image
+# Pull dev image (Jazzy)
 docker pull ghcr.io/pondersome/grunt:jazzy-dev
+
+# Pull legacy Humble dev image
+docker pull ghcr.io/pondersome/grunt:humble-dev
 ```
 
 ### List Local Images
@@ -119,26 +119,26 @@ docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
 
 ```bash
 # Remove specific image
-docker rmi grunt:humble-dev
+docker rmi grunt:jazzy-dev
 
 # Remove all unused images
 docker image prune -a
 
 # Force remove image (even if containers exist)
-docker rmi -f grunt:humble-dev
+docker rmi -f grunt:jazzy-dev
 ```
 
 ### Inspect Images
 
 ```bash
 # Show image details (layers, env vars, etc.)
-docker inspect ghcr.io/pondersome/grunt:humble-dev
+docker inspect ghcr.io/pondersome/grunt:jazzy-dev
 
 # Show image history (layer sizes)
-docker history ghcr.io/pondersome/grunt:humble-dev
+docker history ghcr.io/pondersome/grunt:jazzy-dev
 
 # Show image architecture
-docker inspect ghcr.io/pondersome/grunt:humble-dev | grep Architecture
+docker inspect ghcr.io/pondersome/grunt:jazzy-dev | grep Architecture
 ```
 
 ---
@@ -148,7 +148,7 @@ docker inspect ghcr.io/pondersome/grunt:humble-dev | grep Architecture
 ### Basic Operations
 
 ```bash
-# Start services (default: Humble)
+# Start services (default: Jazzy)
 docker compose -f compose/viz/rviz.yaml up
 
 # Start services in background
@@ -170,14 +170,14 @@ docker compose -f compose/viz/rviz.yaml logs -f
 ### Multi-Distro Operations
 
 ```bash
-# Use Jazzy instead of Humble
-ROS_DISTRO=jazzy docker compose -f compose/viz/rviz.yaml up
+# Use legacy Humble instead of Jazzy (default)
+ROS_DISTRO=humble docker compose -f compose/viz/rviz.yaml up
 
 # Set custom ROS_DOMAIN_ID
 ROS_DOMAIN_ID=42 docker compose -f compose/viz/rviz.yaml up
 
 # Combine environment variables
-ROS_DISTRO=jazzy ROS_DOMAIN_ID=42 docker compose -f compose/viz/rviz.yaml up
+ROS_DISTRO=humble ROS_DOMAIN_ID=42 docker compose -f compose/viz/rviz.yaml up
 ```
 
 ### Visualization Services
@@ -265,18 +265,18 @@ docker compose -f compose/viz/bash.yaml exec bash ros2 topic list
 ### Interactive Shells
 
 ```bash
-# Interactive bash shell (Humble dev)
+# Interactive bash shell (Jazzy dev)
 docker run -it --rm \
   --network=host \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   bash
 
 # Interactive bash with workspace mounted
 docker run -it --rm \
   --network=host \
-  -v ~/ros2/humble/dev_ws:/home/dev/dev_ws:rw \
+  -v ~/ros2/jazzy/dev_ws:/home/dev/dev_ws:rw \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   bash
 
 # Interactive bash with WSLg GUI support
@@ -288,7 +288,7 @@ docker run -it --rm \
   -e WAYLAND_DISPLAY=${WAYLAND_DISPLAY} \
   -e XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR} \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   bash
 ```
 
@@ -302,7 +302,7 @@ docker run -it --rm \
   -e WAYLAND_DISPLAY=${WAYLAND_DISPLAY} \
   -e XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR} \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   rviz2
 
 # Launch RQT
@@ -312,20 +312,20 @@ docker run -it --rm \
   -e WAYLAND_DISPLAY=${WAYLAND_DISPLAY} \
   -e XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR} \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   rqt
 
 # Run ROS 2 CLI commands
 docker run -it --rm \
   --network=host \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   ros2 topic list
 
 docker run -it --rm \
   --network=host \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   ros2 node list
 ```
 
@@ -338,7 +338,7 @@ docker run -it --rm \
   -v $(pwd)/config/dds:/dds_config:ro \
   -e FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml \
   --user dev \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   bash
 ```
 
@@ -373,13 +373,13 @@ docker buildx ls
 
 ```bash
 # Test ARM64 emulation
-docker run --rm --platform linux/arm64 ubuntu:22.04 uname -m
+docker run --rm --platform linux/arm64 ubuntu:24.04 uname -m
 # Should output: aarch64
 
 # Test multi-arch build without pushing
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target base \
   -t test:multi \
   -f base/Dockerfile .
@@ -408,26 +408,26 @@ docker logout ghcr.io
 
 ```bash
 # Tag local image for registry
-docker tag grunt:humble-dev ghcr.io/pondersome/grunt:humble-dev
+docker tag grunt:jazzy-dev ghcr.io/pondersome/grunt:jazzy-dev
 
 # Push to registry
-docker push ghcr.io/pondersome/grunt:humble-dev
+docker push ghcr.io/pondersome/grunt:jazzy-dev
 
 # Pull from registry
-docker pull ghcr.io/pondersome/grunt:humble-dev
+docker pull ghcr.io/pondersome/grunt:jazzy-dev
 
 # Pull specific platform
-docker pull --platform linux/arm64 ghcr.io/pondersome/grunt:humble-dev
+docker pull --platform linux/arm64 ghcr.io/pondersome/grunt:jazzy-dev
 ```
 
 ### Inspect Registry Images
 
 ```bash
 # Show manifest (architectures available)
-docker buildx imagetools inspect ghcr.io/pondersome/grunt:humble
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy
 
 # Show manifest for specific tag
-docker buildx imagetools inspect ghcr.io/pondersome/grunt:humble-dev
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy-dev
 ```
 
 ---
@@ -444,19 +444,19 @@ docker ps
 docker ps -a
 
 # Show container logs
-docker logs grunt_rviz_humble
+docker logs grunt_rviz_jazzy
 
 # Follow container logs
-docker logs -f grunt_rviz_humble
+docker logs -f grunt_rviz_jazzy
 
 # Execute command in running container
-docker exec -it grunt_bash_humble bash
+docker exec -it grunt_bash_jazzy bash
 
 # Inspect container details
-docker inspect grunt_bash_humble
+docker inspect grunt_bash_jazzy
 
 # Show container resource usage
-docker stats grunt_bash_humble
+docker stats grunt_bash_jazzy
 ```
 
 ### Container Cleanup
@@ -469,44 +469,44 @@ docker stop $(docker ps -q)
 docker container prune
 
 # Remove specific container
-docker rm grunt_bash_humble
+docker rm grunt_bash_jazzy
 
 # Force remove running container
-docker rm -f grunt_bash_humble
+docker rm -f grunt_bash_jazzy
 ```
 
 ### Workspace Debugging
 
 ```bash
 # Check workspace inside container
-docker exec -it grunt_bash_humble ls -la /home/dev/dev_ws
+docker exec -it grunt_bash_jazzy ls -la /home/dev/dev_ws
 
 # Check if workspace is sourced
-docker exec -it grunt_bash_humble bash -c "source /home/dev/dev_ws/install/setup.bash && ros2 pkg list"
+docker exec -it grunt_bash_jazzy bash -c "source /home/dev/dev_ws/install/setup.bash && ros2 pkg list"
 
 # Build workspace inside container
-docker exec -it grunt_bash_humble bash -c "cd ~/dev_ws && colcon build --symlink-install"
+docker exec -it grunt_bash_jazzy bash -c "cd ~/dev_ws && colcon build --symlink-install"
 
 # Check ROS environment
-docker exec -it grunt_bash_humble printenv | grep ROS
+docker exec -it grunt_bash_jazzy printenv | grep ROS
 ```
 
 ### Network Debugging
 
 ```bash
 # Check network interfaces inside container
-docker exec -it grunt_bash_humble ip addr
+docker exec -it grunt_bash_jazzy ip addr
 
 # Check if ZeroTier interface is visible
-docker exec -it grunt_bash_humble ifconfig | grep zt
+docker exec -it grunt_bash_jazzy ifconfig | grep zt
 
 # Test DDS discovery
-docker exec -it grunt_bash_humble ros2 topic list
+docker exec -it grunt_bash_jazzy ros2 topic list
 
 # Check DDS participants
-docker exec -it grunt_bash_humble ros2 daemon status
-docker exec -it grunt_bash_humble ros2 daemon stop
-docker exec -it grunt_bash_humble ros2 daemon start
+docker exec -it grunt_bash_jazzy ros2 daemon status
+docker exec -it grunt_bash_jazzy ros2 daemon stop
+docker exec -it grunt_bash_jazzy ros2 daemon start
 ```
 
 ### GUI Debugging (WSLg/X11)
@@ -524,7 +524,7 @@ ls -la /mnt/wslg/
 docker run --rm -it \
   -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
   -e DISPLAY=${DISPLAY} \
-  ubuntu:22.04 \
+  ubuntu:24.04 \
   bash -c "apt-get update && apt-get install -y x11-apps && xeyes"
 
 # Test Wayland connection (WSLg)
@@ -532,7 +532,7 @@ docker run --rm -it \
   -v /mnt/wslg:/mnt/wslg:rw \
   -e WAYLAND_DISPLAY=${WAYLAND_DISPLAY} \
   -e XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR} \
-  ubuntu:22.04 \
+  ubuntu:24.04 \
   bash -c "apt-get update && apt-get install -y weston && weston-info"
 ```
 
@@ -544,7 +544,7 @@ docker run --rm -it \
 
 ```bash
 # 1. Pull latest dev image
-docker pull ghcr.io/pondersome/grunt:humble-dev
+docker pull ghcr.io/pondersome/grunt:jazzy-dev
 
 # 2. Start interactive container
 docker compose -f compose/viz/bash.yaml up
@@ -580,25 +580,25 @@ vim base/Dockerfile
 
 # 2. Build locally to test (single arch)
 docker build \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t grunt:humble-dev-test \
+  -t grunt:jazzy-dev-test \
   -f base/Dockerfile .
 
 # 3. Test the image
-docker run -it --rm grunt:humble-dev-test bash
+docker run -it --rm grunt:jazzy-dev-test bash
 
 # 4. Build multi-arch and push
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t ghcr.io/pondersome/grunt:humble-dev \
+  -t ghcr.io/pondersome/grunt:jazzy-dev \
   --push \
   -f base/Dockerfile .
 
 # 5. Verify push
-docker buildx imagetools inspect ghcr.io/pondersome/grunt:humble-dev
+docker buildx imagetools inspect ghcr.io/pondersome/grunt:jazzy-dev
 ```
 
 ### Quick Testing Without Compose
@@ -606,18 +606,18 @@ docker buildx imagetools inspect ghcr.io/pondersome/grunt:humble-dev
 ```bash
 # Test ROS 2 environment
 docker run -it --rm --network=host \
-  ghcr.io/pondersome/grunt:humble-dev \
-  bash -c "source /opt/ros/humble/setup.bash && ros2 topic list"
+  ghcr.io/pondersome/grunt:jazzy-dev \
+  bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic list"
 
 # Test package availability
 docker run -it --rm \
-  ghcr.io/pondersome/grunt:humble-dev \
-  bash -c "source /opt/ros/humble/setup.bash && ros2 pkg list | grep moveit"
+  ghcr.io/pondersome/grunt:jazzy-dev \
+  bash -c "source /opt/ros/jazzy/setup.bash && ros2 pkg list | grep moveit"
 
 # Check installed dependencies
 docker run -it --rm \
-  ghcr.io/pondersome/grunt:humble-dev \
-  dpkg -l | grep ros-humble
+  ghcr.io/pondersome/grunt:jazzy-dev \
+  dpkg -l | grep ros-jazzy
 ```
 
 ---
@@ -628,7 +628,7 @@ Common environment variables used in compose files and docker run:
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `ROS_DISTRO` | Select ROS distribution | `humble`, `jazzy` |
+| `ROS_DISTRO` | Select ROS distribution | `jazzy` (default), `humble` (legacy) |
 | `ROS_DOMAIN_ID` | ROS 2 domain ID | `0` (default), `1`, `42` |
 | `RMW_IMPLEMENTATION` | ROS middleware | `rmw_fastrtps_cpp`, `rmw_cyclonedds_cpp` |
 | `FASTRTPS_DEFAULT_PROFILES_FILE` | DDS config file path | `/dds_config/fastrtps_unicast.xml` |
@@ -649,7 +649,7 @@ export DOCKER_BUILDKIT=1
 
 # Use inline cache for multi-arch builds
 docker buildx build \
-  --cache-from=type=registry,ref=ghcr.io/pondersome/grunt:humble-dev \
+  --cache-from=type=registry,ref=ghcr.io/pondersome/grunt:jazzy-dev \
   --cache-to=type=inline \
   ...
 ```

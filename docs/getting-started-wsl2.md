@@ -348,11 +348,11 @@ echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password
 
 ```bash
 # Pull the development image (includes ROS 2, RViz, RQT, Nav2)
-docker pull ghcr.io/pondersome/grunt:humble-dev
+docker pull ghcr.io/pondersome/grunt:jazzy-dev
 
 # Verify image
 docker images | grep grunt
-# Should show: ghcr.io/pondersome/grunt with tag humble-dev
+# Should show: ghcr.io/pondersome/grunt with tag jazzy-dev
 ```
 
 **Image size**: ~1.2GB compressed, ~3.5GB uncompressed
@@ -369,7 +369,7 @@ The workspace setup script automates cloning the standard repositories.
 
 ```bash
 # If ~/ros2 doesn't exist yet, create it now
-mkdir -p ~/ros2/humble
+mkdir -p ~/ros2/jazzy
 
 # Verify ownership
 ls -ld ~/ros2
@@ -384,11 +384,13 @@ ls -ld ~/ros2
 ```bash
 # From grunt_docker repository root
 cd ~/grunt_docker
-./tools/setup-dev-workspace.sh humble
+./tools/setup-dev-workspace.sh jazzy
 ```
 
+(Pass `humble` instead of `jazzy` to set up a workspace for the legacy Humble images.)
+
 This script will:
-1. Create `~/ros2/humble/dev_ws/src/`
+1. Create `~/ros2/jazzy/dev_ws/src/`
 2. Install `vcstool` (if not already installed)
 3. Clone 5 standard repositories:
    - `grunt` - Core platform packages
@@ -400,7 +402,7 @@ This script will:
 ### 9.3 Verify Workspace Structure
 
 ```bash
-ls ~/ros2/humble/dev_ws/src/
+ls ~/ros2/jazzy/dev_ws/src/
 # Should show: grunt, roarm_ws_em0, audio_common, by_your_command, realsense-ros
 ```
 
@@ -418,7 +420,7 @@ docker compose -f compose/viz/bash.yaml run --rm bash
 
 This launches an interactive bash shell in the development container with:
 - Workspace mounted at `~/dev_ws`
-- ROS 2 Humble environment sourced
+- ROS 2 Jazzy environment sourced
 - GUI support via WSLg
 - Host networking for ROS 2 discovery
 
@@ -471,7 +473,7 @@ In a new WSL2 terminal:
 
 ```bash
 # Publish a test transform
-docker exec -it grunt_rviz_humble bash -c "ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map base_link"
+docker exec -it grunt_rviz_jazzy bash -c "ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 map base_link"
 ```
 
 In RViz window:
@@ -510,7 +512,7 @@ In a new WSL2 terminal:
 
 ```bash
 # Publish a test topic
-docker exec -it grunt_rqt_humble bash -c "ros2 topic pub /test_topic std_msgs/msg/String \"data: 'Hello from WSL2'\" --rate 1"
+docker exec -it grunt_rqt_jazzy bash -c "ros2 topic pub /test_topic std_msgs/msg/String \"data: 'Hello from WSL2'\" --rate 1"
 ```
 
 Should see `/test_topic` with messages in Topic Monitor.
@@ -551,7 +553,7 @@ docker compose -f compose/viz/rviz.yaml up -d
 
 ```bash
 # From WSL2 host
-docker exec -it grunt_rviz_humble bash -c "ros2 topic list"
+docker exec -it grunt_rviz_jazzy bash -c "ros2 topic list"
 # Should see topics from remote robots (e.g., /betty/camera/image_raw)
 ```
 
@@ -595,7 +597,7 @@ Launches both RViz2 and RQT in a single container:
 Edit `tools/grunt_repos.yaml` to add repositories, then re-run:
 
 ```bash
-./tools/setup-dev-workspace.sh humble
+./tools/setup-dev-workspace.sh jazzy
 ```
 
 ### Advanced Topics
@@ -623,7 +625,7 @@ Edit `tools/grunt_repos.yaml` to add repositories, then re-run:
 You now have a complete Grunt Docker development environment with:
 - ✅ WSL2 with mirrored networking or ZeroTier
 - ✅ Native Docker Engine
-- ✅ ROS 2 Humble workspace with standard packages
+- ✅ ROS 2 Jazzy workspace with standard packages
 - ✅ RViz2 and RQT visualization tools
 - ✅ Cross-network robot communication
 

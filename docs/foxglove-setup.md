@@ -34,7 +34,7 @@ Before setting up Foxglove Bridge, you must have:
 - **WSL2 with Ubuntu 22.04/24.04** (Windows 11) or **native Ubuntu Linux**
 - **Docker CE** installed (native Docker, not Docker Desktop)
   - See [native-docker-wsl2-setup.md](native-docker-wsl2-setup.md) for installation
-- **Working ROS 2 environment** (Humble or Jazzy)
+- **Working ROS 2 environment** (Jazzy, or legacy Humble)
   - Verify: `docker compose -f compose/viz/bash.yaml run --rm bash` should work
 - **VPN connection** to robot network (ZeroTier or similar)
   - See [wsl2-visualization.md](wsl2-visualization.md#zerotier-setup-options)
@@ -175,14 +175,14 @@ From the `grunt_docker` repository root:
 docker compose -f compose/foxglove/bridge.yaml up
 ```
 
-**First time**: Docker will pull `ghcr.io/pondersome/grunt:humble-dev` if not already cached locally
+**First time**: Docker will pull `ghcr.io/pondersome/grunt:jazzy-dev` if not already cached locally
 
-The image includes `ros-humble-foxglove-bridge` installed via apt.
+The image includes `ros-jazzy-foxglove-bridge` installed via apt.
 
 **Output should show:**
 ```
-foxglove_bridge_humble | [INFO] Foxglove Bridge started on port 8765
-foxglove_bridge_humble | [INFO] Listening for WebSocket connections...
+foxglove_bridge_jazzy | [INFO] Foxglove Bridge started on port 8765
+foxglove_bridge_jazzy | [INFO] Listening for WebSocket connections...
 ```
 
 ### Step 2: Open Foxglove Studio
@@ -243,7 +243,7 @@ All environment variables support customization:
 | `ROS_DOMAIN_ID` | `0` | ROS 2 DDS domain (must match robots) |
 | `RMW_IMPLEMENTATION` | `rmw_fastrtps_cpp` | DDS middleware |
 | `FOXGLOVE_PORT` | `8765` | WebSocket port |
-| `ROS_DISTRO` | `humble` | ROS 2 distro (humble or jazzy) |
+| `ROS_DISTRO` | `jazzy` | ROS 2 distro (jazzy, or humble for legacy) |
 
 **Override example:**
 
@@ -251,8 +251,8 @@ All environment variables support customization:
 # Use different port
 FOXGLOVE_PORT=9000 docker compose -f compose/foxglove/bridge.yaml up
 
-# Use Jazzy instead of Humble
-ROS_DISTRO=jazzy docker compose -f compose/foxglove/bridge.yaml up
+# Use legacy Humble instead of Jazzy (default)
+ROS_DISTRO=humble docker compose -f compose/foxglove/bridge.yaml up
 
 # Use different ROS domain
 ROS_DOMAIN_ID=42 docker compose -f compose/foxglove/bridge.yaml up
@@ -272,8 +272,8 @@ If you have custom ROS 2 messages in your workspace:
    ```
 
 2. **Bridge auto-sources workspace** via volume mount:
-   - `~/ros2/humble/dev_ws` → `/home/dev/dev_ws` (read-only)
-   - `~/ros2/humble/sim_ws` → `/home/dev/sim_ws` (read-only)
+   - `~/ros2/jazzy/dev_ws` → `/home/dev/dev_ws` (read-only)
+   - `~/ros2/jazzy/sim_ws` → `/home/dev/sim_ws` (read-only)
 
 3. **Restart bridge** to pick up new message types:
    ```bash
@@ -412,7 +412,7 @@ Bridge will auto-restart if it crashes (configured with `restart: unless-stopped
    echo $ROS_DOMAIN_ID
 
    # Inside bridge container
-   docker exec -it foxglove_bridge_humble bash -c 'echo $ROS_DOMAIN_ID'
+   docker exec -it foxglove_bridge_jazzy bash -c 'echo $ROS_DOMAIN_ID'
 
    # On robot (SSH to Barney)
    echo $ROS_DOMAIN_ID
@@ -423,8 +423,8 @@ Bridge will auto-restart if it crashes (configured with `restart: unless-stopped
 2. **Check DDS discovery**:
    ```bash
    # Inside bridge container
-   docker exec -it foxglove_bridge_humble bash
-   source /opt/ros/humble/setup.bash
+   docker exec -it foxglove_bridge_jazzy bash
+   source /opt/ros/jazzy/setup.bash
    ros2 topic list
    # Should see robot topics
    ```
@@ -441,7 +441,7 @@ Bridge will auto-restart if it crashes (configured with `restart: unless-stopped
 4. **Check FastRTPS profile** (if using unicast):
    ```bash
    # Inside bridge container
-   docker exec -it foxglove_bridge_humble bash -c 'echo $FASTRTPS_DEFAULT_PROFILES_FILE'
+   docker exec -it foxglove_bridge_jazzy bash -c 'echo $FASTRTPS_DEFAULT_PROFILES_FILE'
    # Should be empty (multicast) or /dds_config/fastrtps_unicast.xml
    ```
 
@@ -492,8 +492,8 @@ docker compose -f compose/foxglove/bridge.yaml logs
 **Common issues:**
 
 1. **ROS 2 distro mismatch**:
-   - Bridge image expects Humble or Jazzy
-   - Check: `docker exec -it foxglove_bridge_humble bash -c 'echo $ROS_DISTRO'`
+   - Bridge image expects Jazzy or legacy Humble
+   - Check: `docker exec -it foxglove_bridge_jazzy bash -c 'echo $ROS_DISTRO'`
 
 2. **Custom message build failure**:
    - If workspace has build errors, bridge may fail to source it
@@ -525,7 +525,7 @@ docker compose -f compose/foxglove/bridge.yaml logs
 
 4. **Check CPU usage**:
    ```bash
-   docker stats foxglove_bridge_humble
+   docker stats foxglove_bridge_jazzy
    # CPU should be <20% for typical workload
    ```
 
@@ -621,9 +621,9 @@ If you decide to deploy bridge on Barney (native install):
 # SSH to Barney
 ssh barney.robodojo.net
 
-# Install Foxglove Bridge via apt (if available for ROS 2 Humble)
+# Install Foxglove Bridge via apt (if available for ROS 2 Jazzy)
 sudo apt update
-sudo apt install ros-humble-foxglove-bridge
+sudo apt install ros-jazzy-foxglove-bridge
 
 # Or install via pip
 pip3 install foxglove-bridge
@@ -643,7 +643,7 @@ Type=simple
 User=barney
 Environment="ROS_DOMAIN_ID=0"
 Environment="RMW_IMPLEMENTATION=rmw_fastrtps_cpp"
-ExecStart=/bin/bash -c "source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && foxglove-bridge --port 8765"
+ExecStart=/bin/bash -c "source /opt/ros/jazzy/setup.bash && source ~/ros2_ws/install/setup.bash && foxglove-bridge --port 8765"
 Restart=always
 RestartSec=5
 

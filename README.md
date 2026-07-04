@@ -2,7 +2,7 @@
 
 **Container infrastructure for the Grunt sentry robot platform**
 
-This repository provides Docker images and compose configurations for running ROS 2 Humble and Jazzy workloads across x86_64 and ARM64 platforms, with emphasis on **operator workstations (Windows 11 + WSL2)** and **development environments**.
+This repository provides Docker images and compose configurations for running ROS 2 Jazzy (and legacy Humble) workloads across x86_64 and ARM64 platforms, with emphasis on **operator workstations (Windows 11 + WSL2)** and **development environments**.
 
 ---
 
@@ -40,7 +40,7 @@ This comprehensive guide walks through the complete setup process (30-45 minutes
 
 ```bash
 # Pull the dev image (includes MoveIt2, Nav2, RealSense, audio_common dependencies)
-docker pull ghcr.io/pondersome/grunt:humble-dev
+docker pull ghcr.io/pondersome/grunt:jazzy-dev
 
 # Launch RViz2 with WSLg (Wayland GUI)
 docker compose -f compose/viz/rviz.yaml up
@@ -115,11 +115,11 @@ docker compose -f compose/viz/bash.yaml up
 
 # Or run containers without GUI tools
 docker run -it --rm --network=host \
-  ghcr.io/pondersome/grunt:humble-dev \
+  ghcr.io/pondersome/grunt:jazzy-dev \
   bash
 ```
 
-Future phases will add headless web-based tools (Foxglove Bridge, Vizanti) better suited for cloud deployments.
+Headless web-based tools (Foxglove Bridge, Vizanti) are also available for cloud deployments - see `compose/foxglove/` and `compose/vizanti/`.
 
 ### Why WSL2 Focus?
 
@@ -141,13 +141,13 @@ The Grunt platform uses a **hybrid containerization strategy**:
 
 **Robots (field-deployed, autonomous):**
 - **Native ROS 2 installs** for direct hardware access and real-time performance
-- **Barney** (x86_64 NUC): Ubuntu 22.04 + Humble, all nodes native
-- **Betty** (Jetson Orin Nano): Ubuntu 22.04 + Humble, hybrid native+container for GPU workloads
-- **BamBam** (RPi 5): Ubuntu 24.04 + Jazzy, migration testbed
+- **Barney** (x86_64 N100): Ubuntu 24.04 + Jazzy, all nodes native (migrated from Humble, April 2026)
+- **Betty** (Jetson Orin Nano): JetPack 6.2 + Humble for now, hybrid native+container for GPU workloads (Jazzy planned with JetPack 7)
+- **BamBam** (RPi 5): Ubuntu 24.04 + Jazzy
 
 **Operator Workstations (Windows 11 + WSL2):**
 - **Containerized visualization**: RViz2, RQT, PlotJuggler via WSLg
-- **Development environments**: Multi-distro support (Humble/Jazzy) with bind-mounted workspaces
+- **Development environments**: Multi-distro support (Jazzy, plus legacy Humble) with bind-mounted workspaces
 - **Web-based tools**: Foxglove Bridge, Vizanti (headless containers)
 
 ### Network Topology
@@ -165,12 +165,12 @@ The Grunt platform uses a **hybrid containerization strategy**:
 
 The `base/Dockerfile` uses a **multi-stage build** with two stages:
 
-#### 1. Base Stage (`ghcr.io/pondersome/grunt:humble`)
+#### 1. Base Stage (`ghcr.io/pondersome/grunt:jazzy`)
 
 **Purpose**: Core ROS 2 environment for deployment and basic operations
 
 **Includes**:
-- ROS 2 Humble/Jazzy Desktop (from `osrf/ros:*-desktop`)
+- ROS 2 Jazzy/Humble Desktop (from `osrf/ros:*-desktop`)
 - Gazebo Harmonic (via gz-harmonic vendor packages)
 - Core dependencies: Cyclone DDS, xacro, RViz2, image_transport
 - External packages from `dependencies.repos` built into `/ros2_ws`
@@ -179,7 +179,7 @@ The `base/Dockerfile` uses a **multi-stage build** with two stages:
 
 **User**: `dev` (UID 1000, matches typical WSL2 user for bind-mount permissions)
 
-#### 2. Dev Stage (`ghcr.io/pondersome/grunt:humble-dev`)
+#### 2. Dev Stage (`ghcr.io/pondersome/grunt:jazzy-dev`)
 
 **Purpose**: Development environment with additional packages for manipulation, navigation, and perception
 
@@ -195,8 +195,8 @@ The `base/Dockerfile` uses a **multi-stage build** with two stages:
 
 | Category | Baked into Image (dev stage) | Built from Source (workspaces) |
 |----------|-------------------------------|--------------------------------|
-| **Manipulation** | MoveIt2 core (`ros-humble-moveit`) | roarm_description, roarm_ws_em0 |
-| **Navigation** | Nav2 full stack (`ros-humble-navigation2`, `nav2-bringup`) | Custom nav configurations |
+| **Manipulation** | MoveIt2 core (`ros-jazzy-moveit`) | roarm_description, roarm_ws_em0 |
+| **Navigation** | Nav2 full stack (`ros-jazzy-navigation2`, `nav2-bringup`) | Custom nav configurations |
 | **Perception** | RealSense SDK (librealsense2-dev, librealsense2-utils) | realsense-ros wrapper |
 | **Control** | ros2_control, ros2_controllers, controller_manager | Custom controllers |
 | **Audio** | PortAudio, ALSA, GStreamer plugins | audio_common, by_your_command, whisper_ros |
@@ -204,21 +204,21 @@ The `base/Dockerfile` uses a **multi-stage build** with two stages:
 
 ### Multi-Distro Support
 
-Both stages support **Humble and Jazzy** via build argument:
+Both stages support **Jazzy and legacy Humble** via build argument:
 
 ```bash
-# Build Humble dev image
-docker buildx build --build-arg ROS_DISTRO=humble --target dev -t grunt:humble-dev .
-
 # Build Jazzy dev image
 docker buildx build --build-arg ROS_DISTRO=jazzy --target dev -t grunt:jazzy-dev .
+
+# Build legacy Humble dev image
+docker buildx build --build-arg ROS_DISTRO=humble --target dev -t grunt:humble-dev .
 ```
 
-Compose files use `${ROS_DISTRO:-humble}` to default to Humble but allow override:
+Compose files use `${ROS_DISTRO:-jazzy}` to default to Jazzy but allow override:
 
 ```bash
-# Use Jazzy instead
-ROS_DISTRO=jazzy docker compose -f compose/viz/rviz.yaml up
+# Use ROS_DISTRO=humble for the legacy Humble images
+ROS_DISTRO=humble docker compose -f compose/viz/rviz.yaml up
 ```
 
 ### Multi-Architecture Builds
@@ -229,9 +229,9 @@ Images support **x86_64 (amd64)** and **ARM64** via Docker buildx:
 # Build multi-arch and push to GHCR
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t ghcr.io/pondersome/grunt:humble-dev \
+  -t ghcr.io/pondersome/grunt:jazzy-dev \
   --push \
   -f base/Dockerfile .
 ```
@@ -253,7 +253,7 @@ Images use a **three-tier workspace layering convention**:
 ### 2. `~/dev_ws` and `~/sim_ws` (Bind-Mounted, Persistent)
 
 - Active development code, bind-mounted from host WSL2 filesystem
-- **Host path**: `~/ros2/{humble,jazzy}/{dev_ws,sim_ws}`
+- **Host path**: `~/ros2/{jazzy,humble}/{dev_ws,sim_ws}`
 - **Container path**: `/home/dev/dev_ws`, `/home/dev/sim_ws`
 - Built inside container with `colcon build`
 - Persists across container restarts
@@ -262,10 +262,10 @@ Images use a **three-tier workspace layering convention**:
 
 ```bash
 # Run the workspace setup script (clones standard repos)
-./tools/setup-dev-workspace.sh humble
-
-# Or for Jazzy
 ./tools/setup-dev-workspace.sh jazzy
+
+# Or for legacy Humble
+./tools/setup-dev-workspace.sh humble
 
 # Build inside container
 docker compose -f compose/viz/bash.yaml run --rm bash
@@ -287,11 +287,11 @@ To add or modify repositories, edit `tools/grunt_repos.yaml`.
 
 ```bash
 # Create distro-specific workspaces
-mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
 mkdir -p ~/ros2/jazzy/{dev_ws,sim_ws}/src
+mkdir -p ~/ros2/humble/{dev_ws,sim_ws}/src
 
 # Clone your development repos manually
-cd ~/ros2/humble/dev_ws/src
+cd ~/ros2/jazzy/dev_ws/src
 git clone https://github.com/pondersome/grunt.git
 # ... other repos
 ```
@@ -354,9 +354,9 @@ See [docs/wsl2-visualization.md](docs/wsl2-visualization.md) for DDS troubleshoo
 All compose files:
 - Use `network_mode: host` for DDS discovery
 - Mount `/mnt/wslg` for WSLg/Wayland GUI support
-- Bind-mount `~/ros2/${ROS_DISTRO:-humble}/dev_ws` and `sim_ws`
+- Bind-mount `~/ros2/${ROS_DISTRO:-jazzy}/dev_ws` and `sim_ws`
 - Run as `dev` user (UID 1000) for proper file permissions
-- Support `${ROS_DISTRO:-humble}` environment variable override
+- Support `${ROS_DISTRO:-jazzy}` environment variable override
 
 ### Example Usage
 
@@ -383,8 +383,8 @@ docker compose -f compose/viz/bash.yaml run --rm bash
 docker compose -f compose/foxglove/bridge.yaml up
 # Then connect browser to ws://localhost:8765
 
-# Override to Jazzy
-ROS_DISTRO=jazzy docker compose -f compose/viz/viz-combined.yaml up
+# Override to legacy Humble
+ROS_DISTRO=humble docker compose -f compose/viz/viz-combined.yaml up
 ```
 
 **DDS Mode Selection:**
@@ -404,7 +404,7 @@ Docker has well-documented issues with ROS 2 ([ROS Docker: 6 reasons why they ar
 
 **Where we DO use Docker:**
 - **Operator workstations** (Windows 11 + WSL2) for visualization and development
-- **Development environments** with multi-distro testing (Humble/Jazzy)
+- **Development environments** with multi-distro testing (Jazzy/Humble)
 - **Dependency isolation** during rapid prototyping
 - **Headless services** (Foxglove Bridge, rosbag recorders, web tools)
 
@@ -428,8 +428,10 @@ grunt_docker/
 │   │   ├── rviz.yaml           # RViz2 (multicast DDS)
 │   │   ├── rqt.yaml            # RQT (multicast DDS)
 │   │   └── viz-combined.yaml   # RViz + RQT together (multicast)
-│   └── foxglove/               # Web-based visualization
-│       └── bridge.yaml         # Foxglove WebSocket bridge
+│   ├── foxglove/               # Web-based visualization
+│   │   └── bridge.yaml         # Foxglove WebSocket bridge
+│   └── vizanti/                # Web-based teleoperation/visualization
+│       └── server.yaml         # Off-robot Vizanti web server
 │
 ├── config/
 │   ├── dds/
@@ -444,6 +446,7 @@ grunt_docker/
 │   ├── foxglove-setup.md       # Foxglove Bridge setup and deployment options
 │   ├── ghcr-setup.md           # GHCR authentication & buildx
 │   ├── native-docker-wsl2-setup.md  # Docker CE installation
+│   ├── vizanti-setup.md        # Vizanti web server setup
 │   ├── wsl2-visualization.md   # WSLg troubleshooting
 │   └── ROADMAP.md              # Implementation roadmap
 │
@@ -455,6 +458,7 @@ grunt_docker/
 │   ├── setup-dev-workspace.sh  # Automated workspace setup script
 │   └── grunt_repos.yaml        # Standard Grunt development repositories
 │
+├── .env.example                # Environment variable defaults (copy to .env)
 └── README.md                   # This file
 ```
 
@@ -487,18 +491,18 @@ grunt_docker/
 ### Building Images Locally
 
 ```bash
-# Build base image (Humble, x86_64 only)
-docker build --build-arg ROS_DISTRO=humble --target base -t grunt:humble -f base/Dockerfile .
+# Build base image (Jazzy, x86_64 only)
+docker build --build-arg ROS_DISTRO=jazzy --target base -t grunt:jazzy -f base/Dockerfile .
 
-# Build dev image (Humble, x86_64 only)
-docker build --build-arg ROS_DISTRO=humble --target dev -t grunt:humble-dev -f base/Dockerfile .
+# Build dev image (Jazzy, x86_64 only)
+docker build --build-arg ROS_DISTRO=jazzy --target dev -t grunt:jazzy-dev -f base/Dockerfile .
 
 # Build multi-arch (requires buildx)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg ROS_DISTRO=humble \
+  --build-arg ROS_DISTRO=jazzy \
   --target dev \
-  -t ghcr.io/pondersome/grunt:humble-dev \
+  -t ghcr.io/pondersome/grunt:jazzy-dev \
   --push \
   -f base/Dockerfile .
 ```
