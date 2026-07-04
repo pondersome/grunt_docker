@@ -237,6 +237,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pulseaudio-utils + libasound2-plugins (ALSA->Pulse bridge) let PortAudio-based
 # nodes reach WSLg's PulseAudio server (/mnt/wslg/PulseServer) for hal audio in/out
 
+# Route ALSA's default device to Pulse: containers have no ALSA hardware, so
+# without this PortAudio spams card-probing errors before finding Pulse
+RUN printf "pcm.!default pulse\nctl.!default pulse\n" > /etc/asound.conf
+
 # Install additional MoveIt2 dependencies (optional, may not be available in all distros)
 RUN apt-get update && \
     (apt-get install -y --no-install-recommends \
