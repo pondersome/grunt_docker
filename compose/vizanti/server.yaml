@@ -1,0 +1,94 @@
+# Vizanti - Web-based Mission Planner & Visualizer
+#
+# PURPOSE: Runs the vizanti web server OFF-ROBOT (admin/operator machine),
+#          taking the flask + websocket + tf_consolidator load off the robot's
+#          CPU-constrained N100. Browser clients connect to this machine.
+#
+# Vizanti is under ACTIVE DEVELOPMENT and is therefore never baked into the
+# grunt images. It builds in the bind-mounted dev workspace:
+#   ./tools/setup-dev-workspace.sh jazzy          # clones vizanti + rws
+#   docker compose -f compose/viz/bash-multicast.yaml run --rm bash
+#     cd ~/dev_ws && colcon build --symlink-install --packages-up-to vizanti_server vizanti_cpp vizanti_msgs
+# Update loop: git pull in dev_ws/src/vizanti, rebuild, restart this service.
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/vizanti/server.yaml up -d
+#
+# Then open browser to: http://<this-machine>:5000
+#
+# Ports:
+#   5000 (VIZANTI_PORT)            - web UI (flask/waitress, HTTP)
+#   5001 (VIZANTI_ROSBRIDGE_PORT)  - rosbridge websocket
+#
+# Alternative websocket server: vizanti_rws.launch.py uses rws (v-kiniv),
+# a faster rosbridge-protocol server (also cloned into dev_ws). Swap the
+# launch file in the command below to use it.
+#
+# See docs/vizanti-setup.md for deployment options and troubleshooting.
+
+services:
+  vizanti:
+    # Vizanti builds in dev_ws; the dev image supplies runtime deps
+    # (rosbridge-suite, flask, waitress)
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-jazzy}-dev
+
+    container_name: vizanti_${ROS_DISTRO:-jazzy}
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: "1000:1000"
+
+    environment:
+      # ROS 2 configuration
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+
+      # Note: No FastRTPS profile - using default multicast for discovery.
+      # For cross-VPN unicast (robot over ZeroTier), uncomment:
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml
+
+      # Vizanti ports
+      - VIZANTI_PORT=${VIZANTI_PORT:-5000}
+      - VIZANTI_ROSBRIDGE_PORT=${VIZANTI_ROSBRIDGE_PORT:-5001}
+
+    volumes:
+      # DDS configuration (optional, for unicast mode)
+      - ../../config/dds:/dds_config:ro
+
+      # Development workspace - vizanti is built and updated here
+      - ~/ros2/${ROS_DISTRO:-jazzy}/dev_ws:/home/dev/dev_ws:rw
+
+      # Simulation workspace (for custom message types)
+      - ~/ros2/${ROS_DISTRO:-jazzy}/sim_ws:/home/dev/sim_ws:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Keep the server running
+    restart: unless-stopped
+
+    # Launch vizanti (rosbridge variant; swap to vizanti_rws.launch.py for rws)
+    command:
+      - /bin/bash
+      - -c
+      - |
+        source /opt/ros/$${ROS_DISTRO}/setup.bash
+        source /ros2_ws/install/setup.bash
+        if [ ! -f ~/dev_ws/install/setup.bash ]; then
+          echo "ERROR: dev_ws not built. Run setup-dev-workspace.sh and colcon build first."
+          echo "See header of this compose file for instructions."
+          exit 1
+        fi
+        source ~/dev_ws/install/setup.bash
+        [ -f ~/sim_ws/install/setup.bash ] && source ~/sim_ws/install/setup.bash
+        ros2 launch vizanti_server vizanti_server.launch.py \
+          port:=$${VIZANTI_PORT:-5000} \
+          port_rosbridge:=$${VIZANTI_ROSBRIDGE_PORT:-5001} \
+          flask_debug:=false
+
+    # Web UI is plain HTTP - a real healthcheck, unlike websocket-only ports
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${VIZANTI_PORT:-5000}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

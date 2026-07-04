@@ -76,15 +76,17 @@ services:
       - /bin/bash
       - -c
       - |
-        source /opt/ros/${ROS_DISTRO}/setup.bash
+        # $$ so the container's baked ROS_DISTRO resolves this, not host-side compose
+        source /opt/ros/$${ROS_DISTRO}/setup.bash
         source /ros2_ws/install/setup.bash
         [ -f ~/dev_ws/install/setup.bash ] && source ~/dev_ws/install/setup.bash
         [ -f ~/sim_ws/install/setup.bash ] && source ~/sim_ws/install/setup.bash
         ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=${FOXGLOVE_PORT:-8765}
 
-    # Health check (optional)
+    # Health check - TCP connect only; the port speaks WebSocket, so a plain
+    # HTTP GET (curl -f) would false-fail even when the bridge is healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${FOXGLOVE_PORT:-8765}"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/${FOXGLOVE_PORT:-8765}"]
       interval: 30s
       timeout: 10s
       retries: 3

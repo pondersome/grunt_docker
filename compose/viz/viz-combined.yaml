@@ -73,7 +73,8 @@ services:
       - -c
       - |
         # Source ROS environment (entrypoint already did this, but be explicit)
-        source /opt/ros/${ROS_DISTRO}/setup.bash
+        # $$ so the container's baked ROS_DISTRO resolves this, not host-side compose
+        source /opt/ros/$${ROS_DISTRO}/setup.bash
         source /ros2_ws/install/setup.bash
         [ -f ~/dev_ws/install/setup.bash ] && source ~/dev_ws/install/setup.bash
         [ -f ~/sim_ws/install/setup.bash ] && source ~/sim_ws/install/setup.bash

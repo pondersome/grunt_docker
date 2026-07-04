@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!--
-  FastRTPS profile matching grunt_bringup configuration for cross-VPN communication
+  FastRTPS unicast profile for cross-VPN (ZeroTier) discovery.
+  Mirrors barney's grunt_bringup/config/fastrtps_profiles.xml.
 
-  This profile mirrors barney's configuration:
-  - Disables built-in transports
-  - Uses custom UDP transport with interface whitelist
-  - Initial peers list commented out (matching working ZeroTier setup)
+  Fleet map (robodojo.net ZeroTier, DNS-resolvable from WSL and containers):
+    hal        10.147.20.20   (Windows-side ZeroTier node on hal)
+    kvlapblack 10.147.20.21   (operator laptop)
+    halbuntu   10.147.20.22   (hal's WSL2 ZeroTier node - containers use this)
+    barney     10.147.20.30   (grunt1)
+    betty      10.147.20.31   (grunt2, Jetson)
+    wilma      10.147.20.33
+    bambam     10.147.20.35   (grunt3, RPi5)
+
+  NOTE: discovery is mutual - this machine must also appear in the robot-side
+  initialPeersList (grunt_bringup fastrtps_profiles.xml) to see robot topics.
 -->
 <profiles xmlns="http://www.eprosima.com">
   <transport_descriptors>
@@ -13,16 +21,13 @@
       <transport_id>udp_transport</transport_id>
       <type>UDPv4</type>
       <interfaceWhiteList>
-        <!-- Only include interfaces that actually exist with native Docker + mirrored networking.
-             Non-existent IPs may cause transport to fail.
-             Remote peers are specified in initialPeersList below.
-
-             IMPORTANT: Update this list if your network configuration changes.
-             Run 'ip addr show' in container to see current interfaces.
-             Include: localhost, ZeroTier VPN, and docker bridge at minimum. -->
+        <!-- Whitelist entries must match LOCAL interfaces; FastDDS ignores
+             entries that don't exist on this machine (with a warning), so
+             all operator-machine ZeroTier IPs are listed for portability.
+             Run 'ip addr show' in the container to see local interfaces. -->
         <address>127.0.0.1</address>        <!-- localhost (always required) -->
-        <address>10.147.20.21</address>     <!-- ZeroTier VPN (kvlapblack) -->
-	      <address>10.147.20.22</address>     <!-- ZeroTier VPN (halbuntu) -->
+        <address>10.147.20.22</address>     <!-- halbuntu (hal WSL2) -->
+        <address>10.147.20.21</address>     <!-- kvlapblack -->
       </interfaceWhiteList>
       <maxInitialPeersRange>100</maxInitialPeersRange>
     </transport_descriptor>
@@ -31,31 +36,44 @@
     <rtps>
       <builtin>
         <initialPeersList>
-          <!-- List remote peers to discover via unicast.
-               Do NOT list unreachable peers - causes 3-5 second lag.
-               Add robots as they come online on the VPN. -->
+          <!-- Remote peers to discover via unicast (DNS names resolve via
+               ZeroTier DNS). Do NOT list unreachable peers - each one adds
+               3-5 seconds of discovery lag. Enable robots as they come online. -->
 
-          <!-- localhost (for multi-node testing on same machine) -->
+          <!-- localhost (multi-node testing on same machine) -->
           <locator>
             <udpv4>
               <address>127.0.0.1</address>
             </udpv4>
           </locator>
 
-          <!-- barney (primary development robot) -->
+          <!-- barney (grunt1, primary development robot) -->
           <locator>
             <udpv4>
-              <address>10.147.20.30</address>
+              <address>barney.robodojo.net</address>
             </udpv4>
           </locator>
 
-          <!-- Add other robots here as needed:
+          <!-- betty (grunt2, Jetson)
           <locator>
             <udpv4>
-              <address>10.147.20.33</address>  <!-\- wilma -\->
+              <address>betty.robodojo.net</address>
             </udpv4>
-          </locator>
-          -->
+          </locator> -->
+
+          <!-- bambam (grunt3, RPi5)
+          <locator>
+            <udpv4>
+              <address>bambam.robodojo.net</address>
+            </udpv4>
+          </locator> -->
+
+          <!-- wilma
+          <locator>
+            <udpv4>
+              <address>wilma.robodojo.net</address>
+            </udpv4>
+          </locator> -->
         </initialPeersList>
       </builtin>
       <useBuiltinTransports>false</useBuiltinTransports>
