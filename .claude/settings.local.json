@@ -6,7 +6,12 @@
       "Bash(docker buildx:*)",
       "Bash(docker run:*)",
       "WebSearch",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(docker exec foxglove_bridge_humble bash -c 'source /opt/ros/humble/setup.bash && ros2 topic list | grep tf')",
+      "Bash(docker exec:*)",
+      "WebFetch(domain:wiki.ros.org)",
+      "Read(//c/Users/IronReign/**)",
+      "Read(///wsl.localhost/Ubuntu-24.04/home/pondersome/**)"
     ],
     "deny": [],
     "ask": []

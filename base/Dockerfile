@@ -230,6 +230,12 @@ RUN apt-get update && \
         || echo "Some optional MoveIt2 packages not available") && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Foxglove Bridge - WebSocket bridge for web-based visualization
+# Provides WebSocket server on port 8765 for Foxglove Studio
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-foxglove-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
 # Switch back to dev user
 USER dev
 WORKDIR /home/dev

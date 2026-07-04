@@ -1,0 +1,91 @@
+# Foxglove Bridge - Web-based ROS 2 Visualization
+#
+# PURPOSE: Provides WebSocket bridge for Foxglove Studio (web-based visualization).
+#          Runs on admin/operator workstation, connects to robot topics via DDS.
+#
+# Quick Start (from repo root):
+#   docker compose -f compose/foxglove/bridge.yaml up
+#
+# Then open browser to: http://localhost:8765
+# Or use Foxglove Studio desktop app: ws://localhost:8765
+#
+# Deployment Strategy: Option A (Bridge on Admin Machine)
+#   - Bridge runs on WSL2/operator workstation (this compose file)
+#   - Connects to robot topics via DDS over VPN
+#   - WebSocket serves to browser (local or remote)
+#   - Pros: No robot resource usage, easy updates, multi-robot support
+#   - Cons: Network bandwidth (DDS traffic crosses VPN)
+#   - See docs/foxglove-setup.md for full deployment analysis
+#
+# Multi-Robot Support:
+#   - Bridge discovers all topics from all robots (/barney/*, /betty/*, /bambam/*)
+#   - Filter by namespace in Foxglove Studio UI
+#   - No manual configuration required
+#
+# Platform Support:
+#   - WSL2 with native Docker (primary focus)
+#   - Native Ubuntu Linux
+#   - Cloud instances (headless)
+
+services:
+  bridge:
+    # Use grunt dev image with foxglove-bridge installed via apt
+    # Package: ros-${ROS_DISTRO}-foxglove-bridge
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-humble}-dev
+
+    container_name: foxglove_bridge_${ROS_DISTRO:-humble}
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: "1000:1000"
+
+    environment:
+      # ROS 2 configuration
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+
+      # Note: No FastRTPS profile - using default multicast for maximum discovery
+      # Bridge needs to see all topics from all robots
+      # For unicast mode (if needed), uncomment:
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml
+
+      # Foxglove Bridge configuration
+      - FOXGLOVE_PORT=${FOXGLOVE_PORT:-8765}
+
+      # Optional: Topic whitelist (commented out - subscribe to all by default)
+      # Uncomment and customize to reduce VPN bandwidth usage:
+      # - ROS_TOPIC_WHITELIST=/barney/tf,/barney/tf_static,/barney/odom,/barney/joint_states
+
+    volumes:
+      # DDS configuration (optional, for unicast mode)
+      - ../../config/dds:/dds_config:ro
+
+      # Development workspace (for custom message types)
+      - ~/ros2/${ROS_DISTRO:-humble}/dev_ws:/home/dev/dev_ws:ro
+
+      # Simulation workspace (for custom message types)
+      - ~/ros2/${ROS_DISTRO:-humble}/sim_ws:/home/dev/sim_ws:ro
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    # Restart policy - keep bridge running
+    restart: unless-stopped
+
+    # Launch Foxglove Bridge
+    command:
+      - /bin/bash
+      - -c
+      - |
+        source /opt/ros/${ROS_DISTRO}/setup.bash
+        source /ros2_ws/install/setup.bash
+        [ -f ~/dev_ws/install/setup.bash ] && source ~/dev_ws/install/setup.bash
+        [ -f ~/sim_ws/install/setup.bash ] && source ~/sim_ws/install/setup.bash
+        ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=${FOXGLOVE_PORT:-8765}
+
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${FOXGLOVE_PORT:-8765}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

@@ -202,6 +202,30 @@ docker compose -f compose/viz/bash-multicast.yaml run --rm bash
 docker compose -f compose/viz/bash.yaml run --rm bash
 ```
 
+### Web-Based Visualization
+
+```bash
+# Foxglove Bridge (web-based visualization)
+docker compose -f compose/foxglove/bridge.yaml up
+
+# Start in background (persistent monitoring)
+docker compose -f compose/foxglove/bridge.yaml up -d
+
+# View logs
+docker compose -f compose/foxglove/bridge.yaml logs -f
+
+# Stop bridge
+docker compose -f compose/foxglove/bridge.yaml down
+
+# Use custom port
+FOXGLOVE_PORT=9000 docker compose -f compose/foxglove/bridge.yaml up
+```
+
+**Connect to bridge:**
+- Web browser: http://localhost:8765
+- Foxglove Studio: ws://localhost:8765
+- Remote: ws://<admin-machine-ip>:8765
+
 ### Multiple Services
 
 ```bash
@@ -210,6 +234,9 @@ docker compose -f compose/viz/bash.yaml -f compose/viz/rviz.yaml up
 
 # Combined viz with bash (multicast)
 docker compose -f compose/viz/bash-multicast.yaml -f compose/viz/viz-combined.yaml up
+
+# RViz/RQT with Foxglove Bridge
+docker compose -f compose/viz/viz-combined.yaml -f compose/foxglove/bridge.yaml up
 ```
 
 ### Service-Specific Operations
@@ -527,12 +554,16 @@ cd ~/dev_ws
 colcon build --symlink-install
 source install/setup.bash
 
-# 4. (In another terminal) Launch RViz and RQT
+# 4. (In another terminal) Launch visualization tools
+# Option A: RViz and RQT (GUI)
 docker compose -f compose/viz/viz-combined.yaml up
 
-# Or launch separately
-docker compose -f compose/viz/rviz.yaml up
-docker compose -f compose/viz/rqt.yaml up
+# Option B: Foxglove Bridge (web-based)
+docker compose -f compose/foxglove/bridge.yaml up -d
+# Then open browser to http://localhost:8765
+
+# Option C: Both (GUI + web)
+docker compose -f compose/viz/viz-combined.yaml -f compose/foxglove/bridge.yaml up
 
 # 5. (In container) Test your nodes
 ros2 launch my_package my_launch.py
@@ -654,7 +685,9 @@ docker compose -f <file> exec <service> <cmd>  # Run command in service
 
 ## See Also
 
+- [docs/getting-started-wsl2.md](getting-started-wsl2.md) - Fresh WSL2 setup guide
 - [docs/ghcr-setup.md](ghcr-setup.md) - Detailed GHCR authentication and buildx setup
 - [docs/native-docker-wsl2-setup.md](native-docker-wsl2-setup.md) - Docker CE installation
 - [docs/dev-workflow.md](dev-workflow.md) - Development workflow patterns
 - [docs/wsl2-visualization.md](wsl2-visualization.md) - WSLg and DDS troubleshooting
+- [docs/foxglove-setup.md](foxglove-setup.md) - Foxglove Bridge setup and deployment options

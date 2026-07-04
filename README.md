@@ -52,6 +52,16 @@ docker compose -f compose/viz/rviz.yaml up
 docker compose -f compose/viz/rqt.yaml up
 ```
 
+### Launch Foxglove Bridge
+
+```bash
+# Web-based visualization (alternative to RViz/RQT)
+docker compose -f compose/foxglove/bridge.yaml up
+
+# Then open browser to http://localhost:8765
+# Or connect Foxglove Studio to ws://localhost:8765
+```
+
 ### Interactive Bash Session
 
 ```bash
@@ -323,7 +333,7 @@ See [docs/wsl2-visualization.md](docs/wsl2-visualization.md) for DDS troubleshoo
 
 ## Compose Files
 
-All compose files are located in `compose/viz/` and support multi-distro via environment variable:
+### Visualization Tools (`compose/viz/`)
 
 | File | Purpose | DDS Mode | GUI |
 |------|---------|----------|-----|
@@ -332,6 +342,12 @@ All compose files are located in `compose/viz/` and support multi-distro via env
 | `rviz.yaml` | RViz2 visualization | Multicast | Yes (WSLg) |
 | `rqt.yaml` | RQT GUI tools | Multicast | Yes (WSLg) |
 | `viz-combined.yaml` | RViz + RQT together | Multicast | Yes (WSLg) |
+
+### Web-Based Tools (`compose/foxglove/`)
+
+| File | Purpose | DDS Mode | GUI |
+|------|---------|----------|-----|
+| `bridge.yaml` | Foxglove Bridge (WebSocket) | Multicast | Web (browser) |
 
 ### Common Features
 
@@ -363,12 +379,16 @@ docker compose -f compose/viz/bash-multicast.yaml run --rm bash
 # Interactive bash with unicast DDS (cross-VPN/NAT)
 docker compose -f compose/viz/bash.yaml run --rm bash
 
+# Foxglove Bridge (web-based visualization)
+docker compose -f compose/foxglove/bridge.yaml up
+# Then connect browser to ws://localhost:8765
+
 # Override to Jazzy
 ROS_DISTRO=jazzy docker compose -f compose/viz/viz-combined.yaml up
 ```
 
 **DDS Mode Selection:**
-- **Multicast** (rviz, rqt, bash-multicast, viz-combined): Best for local networks (same WiFi/Ethernet)
+- **Multicast** (rviz, rqt, bash-multicast, viz-combined, foxglove): Best for local networks (same WiFi/Ethernet)
 - **Unicast** (bash): Required for cross-VPN/NAT scenarios with explicit peer configuration
 
 ---
@@ -402,12 +422,14 @@ grunt_docker/
 │   └── dependencies.repos      # External ROS packages
 │
 ├── compose/
-│   └── viz/                    # Visualization containers (WSL2)
-│       ├── bash.yaml           # Interactive shell (unicast DDS)
-│       ├── bash-multicast.yaml # Interactive shell (multicast DDS)
-│       ├── rviz.yaml           # RViz2 (multicast DDS)
-│       ├── rqt.yaml            # RQT (multicast DDS)
-│       └── viz-combined.yaml   # RViz + RQT together (multicast)
+│   ├── viz/                    # GUI visualization containers (WSL2)
+│   │   ├── bash.yaml           # Interactive shell (unicast DDS)
+│   │   ├── bash-multicast.yaml # Interactive shell (multicast DDS)
+│   │   ├── rviz.yaml           # RViz2 (multicast DDS)
+│   │   ├── rqt.yaml            # RQT (multicast DDS)
+│   │   └── viz-combined.yaml   # RViz + RQT together (multicast)
+│   └── foxglove/               # Web-based visualization
+│       └── bridge.yaml         # Foxglove WebSocket bridge
 │
 ├── config/
 │   ├── dds/
@@ -416,8 +438,10 @@ grunt_docker/
 │       └── default.rviz          # Default RViz config
 │
 ├── docs/
+│   ├── getting-started-wsl2.md # Fresh WSL2 setup guide
 │   ├── docker-commands-cheatsheet.md  # Docker command reference
 │   ├── dev-workflow.md         # Dev layer pattern guide
+│   ├── foxglove-setup.md       # Foxglove Bridge setup and deployment options
 │   ├── ghcr-setup.md           # GHCR authentication & buildx
 │   ├── native-docker-wsl2-setup.md  # Docker CE installation
 │   ├── wsl2-visualization.md   # WSLg troubleshooting
@@ -443,6 +467,7 @@ grunt_docker/
 - **[docs/getting-started-wsl2.md](docs/getting-started-wsl2.md)** - **START HERE**: Complete WSL2 setup guide (30-45 min)
 - **[docs/native-docker-wsl2-setup.md](docs/native-docker-wsl2-setup.md)** - Docker CE installation details (referenced by getting-started)
 - **[docs/wsl2-visualization.md](docs/wsl2-visualization.md)** - WSLg troubleshooting, DDS configuration, ZeroTier setup
+- **[docs/foxglove-setup.md](docs/foxglove-setup.md)** - Foxglove Bridge setup, deployment options (admin vs robot), performance tuning
 
 ### Workflow & Operations
 

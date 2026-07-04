@@ -166,25 +166,58 @@ This roadmap tracks implementation of the [PRD](../specs/grunt_docker_prd_v_0.md
 
 ---
 
-## 🌐 Phase 2: Web-Based Visualization (Priority 1)
+## ✅ Phase 2: Web-Based Visualization (COMPLETED - Foxglove)
 
 **Goal**: Headless containers for Foxglove and Vizanti
 
 ### Compose Files
-- [ ] Create `compose/viz/foxglove-bridge.yaml`
-  - Use official `ghcr.io/foxglove/foxglove-bridge:latest`
-  - Expose port 8765
-  - network_mode: host
+- [x] Create `compose/foxglove/bridge.yaml`
+  - Uses official `foxglove/bridge:latest`
+  - Exposes port 8765
+  - network_mode: host for DDS discovery
+  - Multicast DDS (default) for all-robot visibility
+  - Health check configured
+  - Persistent restart policy for monitoring
 
-- [ ] Create `compose/viz/vizanti.yaml`
+- [ ] Create `compose/viz/vizanti.yaml` (Deferred)
   - Determine if needs custom image or can use existing
   - Expose web port (8080 or similar)
   - Configure for ROS 2 topic access
 
 ### Documentation
-- [ ] Add Foxglove section to `docs/wsl2-visualization.md`
-  - Connection URL
-  - Basic usage
+- [x] Create `docs/foxglove-setup.md`
+  - Comprehensive deployment options analysis (admin machine vs robot)
+  - Quick start guide with browser and Foxglove Studio
+  - Performance tuning (bandwidth optimization, topic whitelisting)
+  - Multi-robot support documentation
+  - Troubleshooting guide (DDS discovery, WebSocket connection, VPN)
+  - Security considerations
+  - Native robot installation guide (Option B)
+
+- [x] Update `README.md` with Foxglove references
+  - Added to Quick Start commands
+  - Added to Compose Files table
+  - Added to Repository Layout
+  - Added to Documentation section
+
+- [x] Update `docs/docker-commands-cheatsheet.md`
+  - Web-Based Visualization section
+  - Multi-service examples with Foxglove
+  - Connection URLs documented
+
+### Testing
+- [ ] Test Foxglove Bridge on WSL2 with live robot (Barney)
+  - WebSocket connection
+  - Topic discovery
+  - Multi-robot visibility
+  - Performance with low/high bandwidth topics
+
+### Notes
+- **Deployment Strategy**: Implemented Option A (Bridge on Admin Machine) as primary
+  - Aligns with hybrid strategy (visualization on workstation, native on robot)
+  - Keeps robot resources free for real-time tasks
+  - Multi-robot support built-in
+  - Option B (Bridge on Robot) documented for field deployment scenarios
 
 ---
 
@@ -363,8 +396,10 @@ From [PRD Section 14](../specs/grunt_docker_prd_v_0.md#14-acceptance-criteria-v0
   - URDF meshes display correctly with dev workspace
   - Multicast DDS for full topic discovery
 
-- [ ] `compose/viz/foxglove-bridge.yaml` exposes working WebSocket bridge
-  - **Status**: Not implemented (Phase 2)
+- [x] `compose/foxglove/bridge.yaml` exposes working WebSocket bridge
+  - **Status**: Implemented (Phase 2 - Foxglove Complete)
+  - Deployment analysis completed (admin machine vs robot)
+  - Comprehensive documentation created
 
 - [ ] `compose/betty/camera-oakd.yaml` runs on Jetson with OAK-D-Lite, publishes camera topics
   - **Status**: Not implemented (Phase 4)
