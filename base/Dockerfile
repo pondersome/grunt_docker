@@ -61,8 +61,10 @@ RUN apt install -y libgflags-dev \
     ros-${ROS_DISTRO}-actuator-msgs \
     ros-${ROS_DISTRO}-vision-msgs \
     python3-pip
-#RUN pip install --break-system-packages setuptools==58.2.0
-RUN pip3 install $([ "${ROS_DISTRO}" = "jazzy" ] && echo "--break-system-packages" || echo "") setuptools==58.2.0
+# setuptools 58.2.0 pin is Humble-only (quiets colcon setup.py deprecations on
+# 22.04/py3.10). It is BROKEN on py3.12 (pkgutil.ImpImporter removed) - never
+# install it on jazzy/24.04, where the stock setuptools is correct.
+RUN if [ "${ROS_DISTRO}" = "humble" ]; then pip3 install setuptools==58.2.0; fi
 
 # Clean up apt package list
 RUN rm -rf /var/lib/apt/lists/*
@@ -73,11 +75,16 @@ WORKDIR /ros2_ws/src
 
 # Create a Python virtual environment for tools
 RUN apt-get update && apt-get install -y python3-venv
-RUN python3 -m venv /opt/venv
+# --system-site-packages: /opt/venv/bin is first in PATH, so any
+# '#!/usr/bin/env python3' script resolves to the venv python at runtime;
+# it must see apt-installed modules (flask, psutil, ROS python libs)
+RUN python3 -m venv --system-site-packages /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install tools in the virtual environment
-RUN pip install vcstool rosdep colcon-common-extensions
+# --ignore-installed: with --system-site-packages pip would otherwise treat
+# system-wide copies as satisfying these and skip creating /opt/venv/bin shims
+RUN pip install --ignore-installed vcstool rosdep colcon-common-extensions
 RUN pip install numpy lark
 # Fix empy version for Humble (requires empy<4.0)
 RUN if [ "${ROS_DISTRO}" = "humble" ]; then pip install 'empy<4.0'; fi
@@ -253,6 +260,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-rosbridge-suite \
     python3-flask \
     python3-waitress \
+    python3-psutil \
+    && rm -rf /var/lib/apt/lists/*
+
+# Message packages for robot topics that viz tools must decode
+# (nmea_msgs: RTK GPS /rtk/nmea sentences - found missing in live testing)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-nmea-msgs \
+    ros-${ROS_DISTRO}-rtcm-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Switch back to dev user
