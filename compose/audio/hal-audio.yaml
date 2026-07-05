@@ -1,0 +1,91 @@
+# Hal Audio - ROS audio in/out on the admin machine for byc
+#
+# PURPOSE: Lets by_your_command (running on the robot) use hal's microphone
+#          and speakers/headset instead of the robot's audio hardware. Audio
+#          flows as ROS topics over DDS; this service runs only the two
+#          hardware-endpoint nodes, wired to Windows audio via WSLg PulseAudio.
+#
+# Topic contract (matches byc's gemini_live launch, all relative to AUDIO_NS):
+#   <AUDIO_NS>/audio           <- published here from hal's mic
+#                                 (audio_common AudioStamped, 16kHz mono, chunk 512;
+#                                  consumed by silero_vad_node on the robot)
+#   <AUDIO_NS>/response_voice  <- subscribed here, played on hal's speakers
+#                                 (audio_common_msgs AudioData, 24kHz PCM16 from Gemini)
+#
+# IMPORTANT: don't run this at the same time as the robot-local
+# audio_capturer_node in the same namespace - two capturers publishing the
+# same topic will interleave audio. Launch byc on the robot without its
+# capturer/player (or in a different namespace) when using hal audio.
+#
+# Prereqs (once):
+#   ./tools/setup-dev-workspace.sh jazzy    # clones audio_common + by_your_command
+#   # build inside a container:
+#   docker compose -f compose/viz/bash-multicast.yaml run --rm bash \
+#     -c "cd ~/dev_ws && colcon build --symlink-install --packages-up-to by_your_command"
+#
+# Quick Start (from repo root):
+#   AUDIO_NS=/grunt1/agent docker compose -f compose/audio/hal-audio.yaml up -d
+
+services:
+  hal-audio:
+    image: ghcr.io/pondersome/grunt:${ROS_DISTRO:-jazzy}-dev
+
+    container_name: hal_audio_${ROS_DISTRO:-jazzy}
+
+    # Run as dev user (UID 1000, matches WSL2 user)
+    user: "1000:1000"
+
+    environment:
+      # ROS 2 configuration
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+
+      # Namespace byc runs under on the robot (topics are relative to this)
+      - AUDIO_NS=${AUDIO_NS:-/grunt1/agent}
+
+      # WSLg PulseAudio (Windows mic + speakers)
+      - PULSE_SERVER=${PULSE_SERVER:-unix:/mnt/wslg/PulseServer}
+
+      # Note: default multicast discovery (works to the robots over ZeroTier's
+      # multicast emulation). For unicast, uncomment:
+      # - FASTRTPS_DEFAULT_PROFILES_FILE=/dds_config/fastrtps_unicast.xml
+
+    volumes:
+      # WSLg sockets (PulseAudio)
+      - /mnt/wslg:/mnt/wslg:rw
+
+      # DDS configuration (optional, for unicast mode)
+      - ../../config/dds:/dds_config:ro
+
+      # Dev workspace - audio_common + by_your_command built here
+      - ~/ros2/${ROS_DISTRO:-jazzy}/dev_ws:/home/dev/dev_ws:rw
+
+    # Host networking for ROS 2 DDS discovery
+    network_mode: host
+
+    restart: unless-stopped
+
+    # Capturer (hal mic -> <ns>/audio) + player (<ns>/response_voice -> hal out)
+    # Parameters mirror byc's gemini_live.launch.py audio nodes.
+    command:
+      - /bin/bash
+      - -c
+      - |
+        source /opt/ros/$${ROS_DISTRO}/setup.bash
+        source /ros2_ws/install/setup.bash
+        if [ ! -f ~/dev_ws/install/setup.bash ]; then
+          echo "ERROR: dev_ws not built - see header of this compose file."
+          exit 1
+        fi
+        source ~/dev_ws/install/setup.bash
+        ros2 run audio_common audio_capturer_node --ros-args \
+          -r __ns:=$${AUDIO_NS} \
+          -p chunk:=512 -p rate:=16000 -p device:=-1 &
+        CAP_PID=$$!
+        ros2 run by_your_command simple_audio_player --ros-args \
+          -r __ns:=$${AUDIO_NS} \
+          -p topic:=response_voice -p sample_rate:=24000 -p channels:=1 -p device:=-1 &
+        PLAY_PID=$$!
+        wait -n
+        kill $$CAP_PID $$PLAY_PID 2>/dev/null
+        exit 1
