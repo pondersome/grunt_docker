@@ -50,8 +50,26 @@ docker compose -f compose/vizanti/server.yaml restart
 docker compose -f compose/vizanti/server.yaml up -d
 ```
 
-Open `http://<admin-machine>:5000` in a browser. From other machines on the
-ZeroTier network: `http://halbuntu.robodojo.net:5000`.
+Open `http://<admin-machine>:5000` in a browser.
+
+### Access from ZeroTier devices (phones, tablets, laptops)
+
+Two names reach the same server from anywhere on the robodojo ZeroTier network:
+
+- **`http://halbuntu.robodojo.net:5000`** — works out of the box. This is the
+  WSL-side ZeroTier node, which is where the container actually listens.
+- **`http://hal.robodojo.net:5000`** — the Windows-side ZeroTier node. Because
+  this machine runs WSL2 in NAT mode, Windows must forward ports 5000/5001
+  into WSL. One-time setup from an **elevated** PowerShell:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File tools\windows\vizanti-portproxy.ps1
+  ```
+
+  The script adds `netsh portproxy` rules (bound to the ZT address only,
+  forwarding via the reboot-stable localhost relay) plus matching firewall
+  rules. Both ports are required: the browser loads the UI from 5000, then
+  opens its websocket directly to 5001.
 
 | Port | Env var | Purpose |
 |---|---|---|
