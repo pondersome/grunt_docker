@@ -9,6 +9,8 @@ Quick reference for common Docker, buildx, and compose commands used in this pro
 - [Image Building](#image-building)
 - [Image Management](#image-management)
 - [Docker Compose](#docker-compose)
+- [Vizanti](#vizanti)
+- [Hal Audio](#hal-audio)
 - [Running Containers Directly](#running-containers-directly)
 - [Multi-Arch Setup](#multi-arch-setup)
 - [Registry Operations](#registry-operations)
@@ -43,7 +45,24 @@ docker build \
   -f base/Dockerfile .
 ```
 
-### Build Multi-Architecture (buildx)
+### Build with Bake (preferred)
+
+`docker-bake.hcl` encodes the full build matrix, so releases are one
+command instead of repeated `buildx build` invocations:
+
+```bash
+# Local single-arch build of base + dev (loads into local Docker)
+docker buildx bake
+
+# Multi-arch release: build and push base + dev for amd64 + arm64,
+# tagged :jazzy / :jazzy-dev plus a date tag
+DATE_TAG=$(date +%Y%m%d) docker buildx bake --builder grunt-builder release --push
+
+# Preview what a target will do without building
+docker buildx bake --print release
+```
+
+### Build Multi-Architecture (raw buildx)
 
 ```bash
 # Build and push multi-arch base stage (Jazzy)
@@ -260,6 +279,100 @@ docker compose -f compose/viz/bash.yaml exec bash ros2 topic list
 
 ---
 
+## Vizanti
+
+Vizanti normally runs as a **Docker container on hal**, the operator
+workstation — not on the robot. Barney keeps a native
+`vizanti.service` as a maintained fallback for when hal is down or off
+the network, but it is **disabled** at boot (2026-09-22) so it can't
+race the container.
+
+**Only one instance at a time.** Both put identically named nodes on
+the same graph. Check which is live before starting either:
+
+```bash
+# Which vizanti is on the graph?
+ros2 node list | grep vizanti
+```
+
+| Node present | Which instance |
+|---|---|
+| `/vizanti_rosbridge` | hal's Docker container (rosbridge backend) |
+| `/vizanti_rws_server` | Barney's native service (RWS backend) |
+
+The other three nodes (`/vizanti_flask_node`,
+`/vizanti_service_handler_node`, `/vizanti_tf_handler_node`) appear in
+both, so the bridge node is the discriminator.
+
+### Hal invocation
+
+Vizanti is never baked into images — it builds from the bind-mounted
+dev workspace (see [docs/vizanti-setup.md](vizanti-setup.md) for the
+one-time setup and update loop).
+
+```bash
+# Start the server (from repo root)
+docker compose -f compose/vizanti/server.yaml up -d
+
+# Logs / restart / stop
+docker compose -f compose/vizanti/server.yaml logs -f
+docker compose -f compose/vizanti/server.yaml restart
+docker compose -f compose/vizanti/server.yaml down
+
+# Custom ports (defaults: 5000 web UI, 5001 rosbridge websocket)
+VIZANTI_PORT=8000 VIZANTI_ROSBRIDGE_PORT=8001 \
+  docker compose -f compose/vizanti/server.yaml up -d
+
+# Health status
+docker inspect vizanti_jazzy --format '{{json .State.Health}}'
+```
+
+**Operator URLs** (browser needs both ports reachable — UI on 5000,
+websocket on 5001):
+- Local / LAN: `http://localhost:5000`
+- ZeroTier devices: `http://halbuntu.robodojo.net:5000` (works out of
+  the box); `http://hal.robodojo.net:5000` after the one-time
+  `tools\windows\vizanti-portproxy.ps1` (elevated PowerShell)
+
+Robot-side fallback commands, operator URLs, and the rationale live in
+the **ponderdocs** repo (separate checkout, sibling of this one under
+`ros2_ws/`):
+
+- `ponderdocs/grunt/docs/operators_cheatsheet.md` → "Vizanti web UI" —
+  fallback service commands + URLs
+- `ponderdocs/grunt/docs/operators_guide.md` → "Where vizanti runs" —
+  why it's on hal, duplicate-node hazard
+
+---
+
+## Hal Audio
+
+Runs byc's two audio hardware endpoints (mic capture + response
+playback) on hal via WSLg PulseAudio, so the robot can use hal's
+headset. Requires `audio_common` + `by_your_command` built in dev_ws —
+see the header of `compose/audio/hal-audio.yaml`.
+
+```bash
+# Start (namespace must match byc on the robot)
+AUDIO_NS=/grunt1/agent docker compose -f compose/audio/hal-audio.yaml up -d
+
+# Logs / stop
+docker compose -f compose/audio/hal-audio.yaml logs -f
+docker compose -f compose/audio/hal-audio.yaml down
+
+# Verify the mic topic is flowing (~31 Hz)
+docker exec hal_audio_jazzy bash -c \
+  "source /opt/ros/jazzy/setup.bash && ros2 topic hz /grunt1/agent/audio"
+```
+
+**Don't run this while the robot-local capturer is publishing in the
+same namespace** — launch byc without its audio nodes when hal audio
+is active. Note the capturer publishes best-effort (sensor-data) QoS;
+custom subscribers need a matching QoS profile or they'll receive
+nothing.
+
+---
+
 ## Running Containers Directly
 
 ### Interactive Shells
@@ -356,11 +469,11 @@ sudo apt-get install -y qemu-user-static
 # Verify QEMU is registered
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-# Create buildx builder
-docker buildx create --use --name gruntx --driver docker-container
+# Create buildx builder (this repo's builder is named grunt-builder)
+docker buildx create --use --name grunt-builder --driver docker-container
 
 # Or use existing builder
-docker buildx use gruntx
+docker buildx use grunt-builder
 
 # Inspect builder
 docker buildx inspect --bootstrap
@@ -636,6 +749,10 @@ Common environment variables used in compose files and docker run:
 | `WAYLAND_DISPLAY` | Wayland display | `wayland-0`, `wayland-1` |
 | `XDG_RUNTIME_DIR` | Runtime directory | `/run/user/1000` |
 | `PULSE_SERVER` | PulseAudio server | `/mnt/wslg/PulseServer` |
+| `VIZANTI_PORT` | Vizanti web UI port | `5000` (default) |
+| `VIZANTI_ROSBRIDGE_PORT` | Vizanti websocket port | `5001` (default) |
+| `AUDIO_NS` | Hal-audio namespace (match byc) | `/grunt1/agent` (default) |
+| `DATE_TAG` | Date tag for bake release builds | `20260922` |
 
 ---
 
@@ -691,3 +808,4 @@ docker compose -f <file> exec <service> <cmd>  # Run command in service
 - [docs/dev-workflow.md](dev-workflow.md) - Development workflow patterns
 - [docs/wsl2-visualization.md](wsl2-visualization.md) - WSLg and DDS troubleshooting
 - [docs/foxglove-setup.md](foxglove-setup.md) - Foxglove Bridge setup and deployment options
+- [docs/vizanti-setup.md](vizanti-setup.md) - Vizanti off-robot server setup, build loop, ZeroTier access
