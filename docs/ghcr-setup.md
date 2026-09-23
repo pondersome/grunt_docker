@@ -121,7 +121,7 @@ echo $GITHUB_PAT | docker login ghcr.io -u pondersome --password-stdin
 
 **Expected output:**
 ```
-WARNING! Your password will be stored unencrypted in /home/karim/.docker/config.json.
+WARNING! Your password will be stored unencrypted in ~/.docker/config.json.
 Configure a credential helper to remove this warning. See
 https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
@@ -156,7 +156,7 @@ Should show something like:
 ### 4.1 Build a Test Image (Local Only)
 
 ```bash
-cd /home/karim/grunt_docker
+cd ~/grunt_docker
 
 # Build for your current architecture only
 docker buildx build \
@@ -275,7 +275,7 @@ docker run -it --rm ghcr.io/pondersome/grunt:test bash
 Now that you've verified the process, do a real multi-arch build:
 
 ```bash
-cd /home/karim/grunt_docker
+cd ~/grunt_docker
 
 # Create buildx builder (if not done already)
 docker buildx create --name gruntbuilder --use
